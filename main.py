@@ -1,4 +1,3 @@
-import requests
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -10,43 +9,49 @@ from telegram.ext import (
     filters
 )
 
+import yfinance as yf
+import pandas as pd
+
 TOKEN = "8566958802:AAHPgbT-9B3tYBRynjkQ68yqSHVC8gv2qQU"
-API_KEY = "672b2df5a4e04e9aabd47c20ea6062b4"
 ADMIN_ID = 5961662950
 
 user_signals = {}
 premium_users = set()
 
-symbols = ["EUR/USD", "GBP/USD", "XAU/USD"]
+symbols_map = {
+    "EUR/USD": "EURUSD=X",
+    "GBP/USD": "GBPUSD=X",
+    "XAU/USD": "GC=F"
+}
 
 
-# ================= Semicolon / Comment Market Data =================
+# ================= MARKET DATA ENGINE (NO API KEY NEEDED) =================
 
-def get_rsi(symbol):
+def get_market_data(symbol_name):
     try:
-        url = f"https://api.twelvedata.com/rsi?symbol={symbol}&interval=1min&apikey={API_KEY}"
-        r = requests.get(url, timeout=10).json()
-        return float(r["values"][0]["rsi"])
+        ticker_symbol = symbols_map.get(symbol_name)
+        ticker = yf.Ticker(ticker_symbol)
+        
+        df = ticker.history(period="5d", interval="1m")
+        
+        if df.empty:
+            return None, None, None
+            
+        price = float(df['Close'].iloc[-1])
+        
+        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
+        ema = float(df['EMA_20'].iloc[-1])
+        
+        delta = df['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).ewm(alpha=1/14, adjust=False).mean()
+        loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
+        rs = gain / loss
+        df['RSI'] = 100 - (100 / (1 + rs))
+        rsi = float(df['RSI'].iloc[-1])
+        
+        return round(rsi, 2), round(price, 4), round(ema, 4)
     except:
-        return None
-
-
-def get_ema(symbol):
-    try:
-        url = f"https://api.twelvedata.com/ema?symbol={symbol}&interval=1min&time_period=20&apikey={API_KEY}"
-        r = requests.get(url, timeout=10).json()
-        return float(r["values"][0]["ema"])
-    except:
-        return None
-
-
-def get_price(symbol):
-    try:
-        url = f"https://api.twelvedata.com/price?symbol={symbol}&apikey={API_KEY}"
-        r = requests.get(url, timeout=10).json()
-        return float(r["price"])
-    except:
-        return None
+        return None, None, None
 
 
 # ================= SIGNAL ENGINE =================
@@ -102,12 +107,10 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # PREMIUM USER
     if user_id in premium_users:
         msg = "💎 PREMIUM SIGNALS\n\n"
-        for s in symbols:
-            rsi = get_rsi(s)
-            ema = get_ema(s)
-            price = get_price(s)
+        for s in symbols_map.keys():
+            rsi, price, ema = get_market_data(s)
             sig = signal_engine(rsi, price, ema)
-            msg += f"{s}\nRSI: {rsi}\nSignal: {sig}\n\n"
+            msg += f"{s}\nRSI: {rsi if rsi else 'None'}\nSignal: {sig}\n\n"
         await update.message.reply_text(msg)
         return
 
@@ -122,12 +125,10 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_signals[user_id] += 1
 
     msg = "📊 FREE SIGNALS\n\n"
-    for s in symbols:
-        rsi = get_rsi(s)
-        ema = get_ema(s)
-        price = get_price(s)
+    for s in symbols_map.keys():
+        rsi, price, ema = get_market_data(s)
         sig = signal_engine(rsi, price, ema)
-        msg += f"{s}\nRSI: {rsi}\nSignal: {sig}\n\n"
+        msg += f"{s}\nRSI: {rsi if rsi else 'None'}\nSignal: {sig}\n\n"
 
     await update.message.reply_text(msg)
 
