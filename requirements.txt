@@ -1,4 +1,6 @@
 python-telegram-bot==20.8
 yfinance
 pandas
+lxml
+
 
