@@ -1,4 +1,6 @@
 import asyncio
+import sqlite3
+from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -16,13 +18,82 @@ TOKEN = "8566958802:AAHPgbT-9B3tYBRynjkQ68yqSHVC8gv2qQU"
 ADMIN_ID = 5961662950
 
 user_signals = {}
-premium_users = set()
 
 symbols_map = {
     "EUR/USD": "EURUSD=X",
     "GBP/USD": "GBPUSD=X",
     "XAU/USD": "GC=F"
 }
+
+# ================= DATABASE SETUP FOR AUTO EXPIRY =================
+
+def init_db():
+    conn = sqlite3.connect('premium_users.db')
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS premium (
+            user_id INTEGER PRIMARY KEY,
+            expiry_date TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def is_premium(user_id):
+    conn = sqlite3.connect('premium_users.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT expiry_date FROM premium WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        expiry_time = datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S')
+        if datetime.now() < expiry_time:
+            return True
+    return False
+
+def add_premium_db(user_id):
+    conn = sqlite3.connect('premium_users.db')
+    cursor = conn.cursor()
+    expiry_date = datetime.now() + timedelta(days=30)
+    cursor.execute("""
+        INSERT OR REPLACE INTO premium (user_id, expiry_date) 
+        VALUES (?, ?)
+    """, (user_id, expiry_date.strftime('%Y-%m-%d %H:%M:%S')))
+    conn.commit()
+    conn.close()
+
+# ================= BACKGROUND AUTO-EXPIRY CHECKER =================
+
+async def check_expiry_loop(application: Application):
+    while True:
+        try:
+            conn = sqlite3.connect('premium_users.db')
+            cursor = conn.cursor()
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            cursor.execute("SELECT user_id FROM premium WHERE expiry_date <= ?", (current_time,))
+            expired_users = cursor.fetchall()
+            
+            for user in expired_users:
+                user_id = user[0]
+                cursor.execute("DELETE FROM premium WHERE user_id = ?", (user_id,))
+                conn.commit()
+                
+                try:
+                    await application.bot.send_message(
+                        chat_id=user_id,
+                        text="⚠️ آپ کا پریمیم مہینہ پورا ہو چکا ہے! سگنلز جاری رکھنے کے لیے دوبارہ سبسکرپشن بائے کریں۔"
+                    )
+                except Exception:
+                    pass
+            conn.close()
+        except Exception as e:
+            print(f"Expiry checker error: {e}")
+            
+        await asyncio.sleep(3600) # ہر 1 گھنٹے بعد خود بخود چیک کرے گا
 
 
 # ================= MARKET DATA ENGINE (NO API KEY NEEDED) =================
@@ -104,8 +175,8 @@ payment_text = (
 async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    # PREMIUM USER
-    if user_id in premium_users:
+    # PREMIUM USER CHECK
+    if is_premium(user_id):
         msg = "💎 PREMIUM SIGNALS\n\n"
         for s in symbols_map.keys():
             rsi, price, ema = get_market_data(s)
@@ -172,13 +243,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data.startswith("approve_"):
         user_id = int(query.data.split("_")[1])
-        premium_users.add(user_id)
+        add_premium_db(user_id)
 
         await context.bot.send_message(
             chat_id=user_id,
-            text="🎉 PREMIUM ACTIVATED!\nNow you have unlimited signals."
+            text="🎉 PREMIUM ACTIVATED!\nNow you have unlimited signals for 30 days."
         )
-        await query.edit_message_caption("✅ Approved")
+        await query.edit_message_caption("✅ Approved (30 Days)")
 
 
 # ================= MANUAL APPROVE =================
@@ -192,11 +263,11 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user_id = int(context.args[0])
-    premium_users.add(user_id)
+    add_premium_db(user_id)
 
     await context.bot.send_message(
         chat_id=user_id,
-        text="🎉 Premium Activated!"
+        text="🎉 Premium Activated for 30 Days!"
     )
     await update.message.reply_text("✅ Approved")
 
@@ -212,5 +283,18 @@ app.add_handler(CommandHandler("approve", approve))
 app.add_handler(MessageHandler(filters.PHOTO, receive_photo))
 app.add_handler(CallbackQueryHandler(button_handler))
 
-print("BOT RUNNING...")
-app.run_polling()
+# آٹو ایکسپائری لوپ کو بیک گراؤنڈ میں اسٹارٹ کرنا
+async def main():
+    await app.initialize()
+    await app.start()
+    asyncio.create_task(check_expiry_loop(app))
+    await app.updater.start_polling()
+    print("BOT RUNNING WITH AUTO-EXPIRY...")
+    
+    # بوٹ کو مستقل چلتے رہنے کے لیے رکھنا
+    while True:
+        await asyncio.sleep(3600)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
