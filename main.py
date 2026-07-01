@@ -22,7 +22,6 @@ QUOTEX_LINK = "https://broker-qx.pro/sign-up/?lid=2182439"
 user_forex_clicks = {}
 user_quotex_clicks = {}
 
-# ریل مارکیٹ فیڈز جو او ٹی سی (OTC) اور فاریکس دونوں کے اینالیسس کے لیے استعمال ہوں گی
 symbols_map = {
     "EURUSD": "EURUSD=X",
     "GBPUSD": "GBPUSD=X",
@@ -78,29 +77,25 @@ def add_quotex_premium_db(user_id):
     conn.commit()
     conn.close()
 
-# 📊 ایڈوانسڈ مارکیٹ اینالیسس انجن (RSI + Moving Average)
+# Advanced Market Analysis Engine
 def advanced_market_analysis(symbol_name):
     try:
         ticker_symbol = symbols_map.get(symbol_name, "EURUSD=X")
         ticker = yf.Ticker(ticker_symbol)
-        # پچھلے 2 دن کا 1 منٹ والا لائیو ڈیٹا اینالیسس کے لیے
         df = ticker.history(period="2d", interval="1m")
         
         if df.empty or len(df) < 20: 
-            return "🟢 CALL (UP)", "BULLISH (💡 Dynamic Support)"
+            return "🟢 CALL (UP) ↑", "BULLISH (💡 Dynamic Support)"
             
-        # 1. RSI کا فارمولا
         delta = df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).ewm(alpha=1/14, adjust=False).mean()
         loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
         rs = gain / loss
         rsi = float((100 - (100 / (1 + rs))).iloc[-1])
         
-        # 2. Moving Average کا ٹرینڈ (آخری قیمت اور 20 منٹ کی اوسط کا موازنہ)
         current_price = float(df['Close'].iloc[-1])
         sma_20 = float(df['Close'].rolling(window=20).mean().iloc[-1])
         
-        # 🧠 مکسڈ اینالیسس لاجک (تکے بازی کے بغیر سچا فلٹر)
         if rsi < 35:
             return "🟢 CALL (UP) ↑", "STRONG BULLISH (⚠️ Oversold Reversal)"
         elif rsi > 65:
@@ -111,7 +106,6 @@ def advanced_market_analysis(symbol_name):
             return "🔴 PUT (DOWN) ↓", "BEARISH TREND (📉 Below SMA-20)"
             
     except:
-        # اگر لائیو فیڈ میں کوئی مسئلہ آئے تو مارکیٹ ٹرینڈ کو ڈائنامک رکھنے کا سیف فلٹر
         direction = random.choice(["🟢 CALL (UP) ↑", "🔴 PUT (DOWN) ↓"])
         trend = "BULLISH (💡 Price Action)" if "CALL" in direction else "BEARISH (💡 Price Action)"
         return direction, trend
@@ -166,7 +160,6 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = "💎 **FOREX PREMIUM SIGNALS (Fully Analyzed)**\n\n"
             for s in ["EURUSD", "GBPUSD", "USDJPY"]:
                 action, trend = advanced_market_analysis(s)
-                # فاریکس فارمیٹ کے لیے CALL/PUT کو BUY/SELL میں بدل دیتے ہیں
                 forex_action = "🟢 BUY" if "CALL" in action else "🔴 SELL"
                 msg += f"💱 {s[:3]}/{s[3:]}\nSignal: {forex_action}\nTrend: {trend}\n\n"
             await update.message.reply_text(msg, parse_mode="Markdown")
@@ -218,7 +211,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if user_quotex_clicks[user_id] >= 3: return
             user_quotex_clicks[user_id] += 1
 
-        # 🧠 لائیو مارکیٹ کا گہرا انڈیکیٹر اینالیسس (RSI + SMA) یہاں رن ہو رہا ہے
         action, trend = advanced_market_analysis(chosen_pair)
         accuracy = random.randint(92, 97)
         
@@ -242,6 +234,4 @@ app.add_handler(MessageHandler(filters.Text(["📊 Forex Signals", "📉 Quotex 
 app.add_handler(CallbackQueryHandler(button_handler))
 
 if __name__ == "__main__":
-    import nest_asyncio
-    nest_asyncio.apply()
     app.run_polling()
