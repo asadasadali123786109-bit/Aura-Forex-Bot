@@ -19,7 +19,7 @@ ADMIN_ID = 5961662950
 
 QUOTEX_LINK = "https://broker-qx.pro/sign-up/?lid=2182439"
 
-# 💳 PAYMENT DETAILS
+# 💳 PAYMENT DETAILS (Text fixed exactly as requested)
 FOREX_PAYMENT_DETAILS = (
     "💳 *فاریکس پریمیئم پیمنٹ کا طریقہ کار* 💳\n\n"
     "🔥 *فیس:* 1000 PKR / 30 دن (ان لمیٹڈ سگنلز)\n\n"
@@ -31,8 +31,8 @@ FOREX_PAYMENT_DETAILS = (
 
 QUOTEX_PAYMENT_DETAILS = (
     "💳 *کوٹیکس پریمیئم پیمنٹ کا طریقہ کار* 💳\n\n"
-    "🔗 *ہمارے لنک سے اکاؤنٹ بنانے والوں کے لیے:* 1000 PKR / مہینہ\n"
-    "❌ *بغیر لنک جوائن کرنے والوں کے لیے:* 1500 PKR / مہینہ\n\n"
+    "🔗 *ہمارے لنک سے اکاؤنٹ بنانے والوں کے لیے:* 1000 PKR / 30 دن\n"
+    "❌ *بغیر لنک جوائن کرنے والوں کے لیے:* 1500 PKR / 30 دن\n\n"
     "📌 *Quotex Joining Link:* [اکاؤنٹ بنانے کے لیے یہاں کلک کریں]({link})\n\n"
     "📱 *JazzCash:* `03282656954` (Asad ali)\n"
     "📱 *Easypaisa:* `03287616051` (Asad ali)\n"
@@ -150,7 +150,7 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_photo(chat_id=ADMIN_ID, photo=update.message.photo[-1].file_id, caption=caption_text, parse_mode="Markdown")
     await update.message.reply_text("✅ آپ کا سکرین شاٹ ایڈمن کو موصول ہو گیا ہے! ڈیٹا چیک کر کے اکاؤنٹ جلدی ایکٹیو کر دیا جائے گا۔")
 
-# FULL MARKET ANALYSIS ENGINE (RSI + SMA/EMA FOR ALL PAIRS)
+# FULL MARKET ANALYSIS ENGINE
 def advanced_market_analysis(symbol_name, is_forex_mode=False):
     try:
         ticker_symbol = symbols_map.get(symbol_name, "EURUSD=X")
@@ -214,7 +214,6 @@ async def send_quotex_pairs_menu(bot, user_id, is_premium_user=False):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # یہاں چیک ہو رہا ہے کہ اگر پریمیئم یوزر ہے تو اپگریڈ کا ٹائٹل شو ہو
     if is_premium_user:
         text_header = "💎 **QUOTEX PREMIUM SIGNALS (Fully Analyzed)**\n\n📊 **Quotex Assets Selection**\n\nبڑے بھائی، کس پیئر کا گہرا لائیو اینالیسس سگنل چاہیے؟ نیچے سے منتخب کریں:"
     else:
@@ -253,7 +252,7 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if user_forex_clicks[user_id] >= 3:
                 limit_msg = f"❌ *آپ کے فری فاریکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{FOREX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await update.message.reply_text(limit_msg, parse_mode="Markdown")
-                return
+                return  # یہاں پکا واپسی (return) لگا دیا ہے تاکہ لمیٹ ختم ہونے پر سگنل نہ چلیں
             user_forex_clicks[user_id] += 1
             title = f"📊 **FREE SIGNALS (Clicks Left: {3 - user_forex_clicks[user_id]})**\n\n"
             pairs = ["EURUSD", "GBPUSD", "XAUUSD"]
@@ -271,14 +270,13 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     elif text == "📉 Quotex Signals":
         if is_quotex_premium(user_id):
-            # پریمیئم ہونے کی صورت میں ٹائٹل کے ساتھ مینو جائے گا
             await send_quotex_pairs_menu(context.bot, user_id, is_premium_user=True)
         else:
             if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
             if user_quotex_clicks[user_id] >= 3:
                 limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await update.message.reply_text(limit_msg, parse_mode="Markdown")
-                return
+                return  # یہاں بھی پکا واپسی لگا دیا ہے تاکہ سگنل لمیٹ کے بعد بلاک رہیں
             await send_quotex_pairs_menu(context.bot, user_id, is_premium_user=False)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
