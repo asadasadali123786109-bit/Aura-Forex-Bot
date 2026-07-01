@@ -19,7 +19,7 @@ ADMIN_ID = 5961662950
 
 QUOTEX_LINK = "https://broker-qx.pro/sign-up/?lid=2182439"
 
-# 💳 PAYMENT DETAILS (Fixed formatting cleanly to avoid Telegram text reversing)
+# 💳 PAYMENT DETAILS (Clean formatting intact)
 FOREX_PAYMENT_DETAILS = (
     "💳 *فاریکس پریمیئم پیمنٹ کا طریقہ کار* 💳\n\n"
     "🔥 *فیس:* 1000 روپے / 30 دن (ان لمیٹڈ سگنلز)\n\n"
@@ -40,9 +40,6 @@ QUOTEX_PAYMENT_DETAILS = (
     "⚠️ *اہم نوٹ:* پیسے بھیجنے یا اکاؤنٹ بنانے کے بعد سکرین شاٹ اسی بوٹ کے اندر سینڈ کریں، یہ خودکار طور پر ایڈمن کو جائے گا۔"
 ).format(link=QUOTEX_LINK)
 
-user_forex_clicks = {}
-user_quotex_clicks = {}
-
 symbols_map = {
     "EURUSD": "EURUSD=X",
     "GBPUSD": "GBPUSD=X",
@@ -52,16 +49,39 @@ symbols_map = {
     "CryptoIDX": "BTC-USD"
 }
 
-# Database functions
+# Database functions (Added free_usage table to completely track clicks)
 def init_db():
     conn = sqlite3.connect('premium_users.db')
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE IF NOT EXISTS premium (user_id INTEGER PRIMARY KEY, expiry_date TEXT)")
     cursor.execute("CREATE TABLE IF NOT EXISTS quotex_premium (user_id INTEGER PRIMARY KEY, expiry_date TEXT)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS free_usage (user_id INTEGER PRIMARY KEY, forex_clicks INTEGER DEFAULT 0, quotex_clicks INTEGER DEFAULT 0)")
     conn.commit()
     conn.close()
 
 init_db()
+
+# Persistent tracking database lookup
+def get_free_clicks(user_id):
+    conn = sqlite3.connect('premium_users.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT forex_clicks, quotex_clicks FROM free_usage WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row[0], row[1]
+    return 0, 0
+
+def increment_free_clicks(user_id, mode="forex"):
+    conn = sqlite3.connect('premium_users.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO free_usage (user_id, forex_clicks, quotex_clicks) VALUES (?, 0, 0)", (user_id,))
+    if mode == "forex":
+        cursor.execute("UPDATE free_usage SET forex_clicks = forex_clicks + 1 WHERE user_id = ?", (user_id,))
+    else:
+        cursor.execute("UPDATE free_usage SET quotex_clicks = quotex_clicks + 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
 
 def is_premium(user_id):
     if user_id == ADMIN_ID:
@@ -118,7 +138,6 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"بڑے بھائی، نیچے دیے گئے بٹن پر کلک کر کے ڈائریکٹ اپروو کریں۔"
     )
     
-    # Inline approval buttons for Admin's personal chat
     keyboard = [
         [
             InlineKeyboardButton("✅ Approve Forex", callback_data=f"adm_appf_{user.id}"),
@@ -182,7 +201,8 @@ def advanced_market_analysis(symbol_name, is_forex_mode=False):
 # Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[KeyboardButton("📊 Forex Signals"), KeyboardButton("📉 Quotex Signals")]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    # Added persistent=True so the keyboard layout stays visible permanently outside the chat window
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
     urdu_welcome = (
         "🌟 *ForeXAurA میں خوش آمدید!* 🌟\n\n"
         "بڑے بھائی، مارکیٹ کا لائیو ڈیٹا اینالائز کر کے پرافٹ ایبل سگنل دینے والا فائنل انجن بالکل تیار ہے۔\n\n"
@@ -234,13 +254,14 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         premium_active = is_premium(user_id)
         
         if not premium_active and user_id != ADMIN_ID:
-            if user_id not in user_forex_clicks: user_forex_clicks[user_id] = 0
-            if user_forex_clicks[user_id] >= 3:
+            forex_clicks, _ = get_free_clicks(user_id)
+            if forex_clicks >= 3:
                 limit_msg = f"❌ *آپ کے فری فاریکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{FOREX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await update.message.reply_text(limit_msg, parse_mode="Markdown")
                 return
-            user_forex_clicks[user_id] += 1
-            title = f"📊 **FREE SIGNALS (Clicks Left: {3 - user_forex_clicks[user_id]})**\n\n"
+            increment_free_clicks(user_id, mode="forex")
+            forex_clicks, _ = get_free_clicks(user_id) # Refresh count
+            title = f"📊 **FREE SIGNALS (Clicks Left: {3 - forex_clicks})**\n\n"
             pairs = ["EURUSD", "GBPUSD", "XAUUSD"]
         else:
             title = "💎 **FOREX PREMIUM SIGNALS (Fully Analyzed)**\n\n"
@@ -258,13 +279,12 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if is_quotex_premium(user_id):
             await send_quotex_pairs_menu(context.bot, user_id, is_premium_user=True)
         else:
-            if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
-            if user_quotex_clicks[user_id] >= 3:
+            _, quotex_clicks = get_free_clicks(user_id)
+            if quotex_clicks >= 3:
                 limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await update.message.reply_text(limit_msg, parse_mode="Markdown")
                 return
-            # Shows clicks left when opening menu
-            left = 3 - user_quotex_clicks[user_id]
+            left = 3 - quotex_clicks
             await send_quotex_pairs_menu(context.bot, user_id, is_premium_user=False, clicks_left=left)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -296,8 +316,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("qxpair_"):
         pair_selected = data.split("_")[1]
         if not is_quotex_premium(user_id):
-            if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
-            if user_quotex_clicks[user_id] >= 3:
+            _, quotex_clicks = get_free_clicks(user_id)
+            if quotex_clicks >= 3:
                 limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await context.bot.send_message(chat_id=user_id, text=limit_msg, parse_mode="Markdown")
                 return
@@ -314,13 +334,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         display_pair = display_map.get(chosen_pair, chosen_pair)
 
         if not is_quotex_premium(user_id):
-            if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
-            if user_quotex_clicks[user_id] >= 3: 
+            _, quotex_clicks = get_free_clicks(user_id)
+            if quotex_clicks >= 3: 
                 limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await context.bot.send_message(chat_id=user_id, text=limit_msg, parse_mode="Markdown")
                 return
-            user_quotex_clicks[user_id] += 1
-            clicks_left_str = f" (Clicks Left: {3 - user_quotex_clicks[user_id]})"
+            increment_free_clicks(user_id, mode="quotex")
+            _, quotex_clicks = get_free_clicks(user_id) # Refresh count
+            clicks_left_str = f" (Clicks Left: {3 - quotex_clicks})"
         else:
             clicks_left_str = ""
 
