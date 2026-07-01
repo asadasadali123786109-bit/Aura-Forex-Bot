@@ -19,7 +19,7 @@ ADMIN_ID = 5961662950
 
 QUOTEX_LINK = "https://broker-qx.pro/sign-up/?lid=2182439"
 
-# 💳 PAYMENT DETAILS (Clean formatting intact)
+# 💳 PAYMENT DETAILS
 FOREX_PAYMENT_DETAILS = (
     "💳 *فاریکس پریمیئم پیمنٹ کا طریقہ کار* 💳\n\n"
     "🔥 *فیس:* 1000 روپے / 30 دن (ان لمیٹڈ سگنلز)\n\n"
@@ -49,7 +49,12 @@ symbols_map = {
     "CryptoIDX": "BTC-USD"
 }
 
-# Database functions (Added free_usage table to completely track clicks)
+# Persistent Main Menu Keyboard Template
+def get_main_menu_keyboard():
+    keyboard = [[KeyboardButton("📊 Forex Signals"), KeyboardButton("📉 Quotex Signals")]]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
+
+# Database functions
 def init_db():
     conn = sqlite3.connect('premium_users.db')
     cursor = conn.cursor()
@@ -61,71 +66,81 @@ def init_db():
 
 init_db()
 
-# Persistent tracking database lookup
 def get_free_clicks(user_id):
-    conn = sqlite3.connect('premium_users.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT forex_clicks, quotex_clicks FROM free_usage WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return row[0], row[1]
+    try:
+        conn = sqlite3.connect('premium_users.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT forex_clicks, quotex_clicks FROM free_usage WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return row[0], row[1]
+    except: pass
     return 0, 0
 
 def increment_free_clicks(user_id, mode="forex"):
-    conn = sqlite3.connect('premium_users.db')
-    cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO free_usage (user_id, forex_clicks, quotex_clicks) VALUES (?, 0, 0)", (user_id,))
-    if mode == "forex":
-        cursor.execute("UPDATE free_usage SET forex_clicks = forex_clicks + 1 WHERE user_id = ?", (user_id,))
-    else:
-        cursor.execute("UPDATE free_usage SET quotex_clicks = quotex_clicks + 1 WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('premium_users.db')
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR IGNORE INTO free_usage (user_id, forex_clicks, quotex_clicks) VALUES (?, 0, 0)", (user_id,))
+        if mode == "forex":
+            cursor.execute("UPDATE free_usage SET forex_clicks = forex_clicks + 1 WHERE user_id = ?", (user_id,))
+        else:
+            cursor.execute("UPDATE free_usage SET quotex_clicks = quotex_clicks + 1 WHERE user_id = ?", (user_id,))
+        conn.commit()
+        conn.close()
+    except: pass
 
 def is_premium(user_id):
     if user_id == ADMIN_ID:
         return True
-    conn = sqlite3.connect('premium_users.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT expiry_date FROM premium WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        if datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S'):
-            return True
+    try:
+        conn = sqlite3.connect('premium_users.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT expiry_date FROM premium WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            if datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S'):
+                return True
+    except: pass
     return False
 
 def is_quotex_premium(user_id):
     if user_id == ADMIN_ID:
         return True
-    conn = sqlite3.connect('premium_users.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT expiry_date FROM quotex_premium WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        if datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S'):
-            return True
+    try:
+        conn = sqlite3.connect('premium_users.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT expiry_date FROM quotex_premium WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            if datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S'):
+                return True
+    except: pass
     return False
 
 def add_premium_db(user_id):
-    conn = sqlite3.connect('premium_users.db')
-    cursor = conn.cursor()
-    expiry = datetime.now() + timedelta(days=30)
-    cursor.execute("INSERT OR REPLACE INTO premium (user_id, expiry_date) VALUES (?, ?)", (user_id, expiry.strftime('%Y-%m-%d %H:%M:%S')))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('premium_users.db')
+        cursor = conn.cursor()
+        expiry = datetime.now() + timedelta(days=30)
+        cursor.execute("INSERT OR REPLACE INTO premium (user_id, expiry_date) VALUES (?, ?)", (user_id, expiry.strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+        conn.close()
+    except: pass
 
 def add_quotex_premium_db(user_id):
-    conn = sqlite3.connect('premium_users.db')
-    cursor = conn.cursor()
-    expiry = datetime.now() + timedelta(days=30)
-    cursor.execute("INSERT OR REPLACE INTO quotex_premium (user_id, expiry_date) VALUES (?, ?)", (user_id, expiry.strftime('%Y-%m-%d %H:%M:%S')))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('premium_users.db')
+        cursor = conn.cursor()
+        expiry = datetime.now() + timedelta(days=30)
+        cursor.execute("INSERT OR REPLACE INTO quotex_premium (user_id, expiry_date) VALUES (?, ?)", (user_id, expiry.strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+        conn.close()
+    except: pass
 
-# SCREENSHOT FORWARDER WITH INLINE BUTTONS FOR ADMIN
 async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id == ADMIN_ID:
@@ -153,9 +168,8 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
-    await update.message.reply_text("✅ آپ کا سکرین شاٹ ایڈمن کو موصول ہو گیا ہے! ڈیٹا چیک کر کے اکاؤنٹ جلدی ایکٹیو کر دیا جائے گا۔")
+    await update.message.reply_text("✅ آپ کا سکرین شاٹ ایڈمن کو موصول ہو گیا ہے! ڈیٹا چیک کر کے اکاؤنٹ جلدی ایکٹیو کر دیا جائے۔", reply_markup=get_main_menu_keyboard())
 
-# FULL MARKET ANALYSIS ENGINE
 def advanced_market_analysis(symbol_name, is_forex_mode=False):
     try:
         ticker_symbol = symbols_map.get(symbol_name, "EURUSD=X")
@@ -198,11 +212,8 @@ def advanced_market_analysis(symbol_name, is_forex_mode=False):
         trend = "BULLISH (💡 Price Action)" if "CALL" in direction else "BEARISH (💡 Price Action)"
         return direction, trend
 
-# Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[KeyboardButton("📊 Forex Signals"), KeyboardButton("📉 Quotex Signals")]]
-    # Added persistent=True so the keyboard layout stays visible permanently outside the chat window
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
+    reply_markup = get_main_menu_keyboard()
     urdu_welcome = (
         "🌟 *ForeXAurA میں خوش آمدید!* 🌟\n\n"
         "بڑے بھائی، مارکیٹ کا لائیو ڈیٹا اینالائز کر کے پرافٹ ایبل سگنل دینے والا فائنل انجن بالکل تیار ہے۔\n\n"
@@ -257,10 +268,10 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             forex_clicks, _ = get_free_clicks(user_id)
             if forex_clicks >= 3:
                 limit_msg = f"❌ *آپ کے فری فاریکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{FOREX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
-                await update.message.reply_text(limit_msg, parse_mode="Markdown")
+                await update.message.reply_text(limit_msg, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
                 return
             increment_free_clicks(user_id, mode="forex")
-            forex_clicks, _ = get_free_clicks(user_id) # Refresh count
+            forex_clicks, _ = get_free_clicks(user_id)
             title = f"📊 **FREE SIGNALS (Clicks Left: {3 - forex_clicks})**\n\n"
             pairs = ["EURUSD", "GBPUSD", "XAUUSD"]
         else:
@@ -273,7 +284,7 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             p_display = "EUR/USD" if p == "EURUSD" else "GBP/USD" if p == "GBPUSD" else "XAU/USD"
             msg += f"*{p_display}*\n{rsi_val}\nSignal: {action}\n\n"
             
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await update.message.reply_text(msg, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
         
     elif text == "📉 Quotex Signals":
         if is_quotex_premium(user_id):
@@ -282,7 +293,7 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             _, quotex_clicks = get_free_clicks(user_id)
             if quotex_clicks >= 3:
                 limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
-                await update.message.reply_text(limit_msg, parse_mode="Markdown")
+                await update.message.reply_text(limit_msg, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
                 return
             left = 3 - quotex_clicks
             await send_quotex_pairs_menu(context.bot, user_id, is_premium_user=False, clicks_left=left)
@@ -293,13 +304,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.message.chat.id
 
-    # ADMIN DIRECT APPROVAL BUTTON LOGIC
     if data.startswith("adm_appf_"):
         target_id = int(data.split("_")[2])
         add_premium_db(target_id)
         await query.edit_message_caption(caption=query.message.caption + "\n\n✅ *Approved for Forex Premium!*")
         try:
-            await context.bot.send_message(chat_id=target_id, text="🎉 مبارک ہو! آپ کا فاریکس پریمیئم اکاؤنٹ 30 دن کے لیے ایکٹیو کر دیا گیا ہے۔")
+            await context.bot.send_message(chat_id=target_id, text="🎉 مبارک ہو! آپ کا فاریکس پریمیئم اکاؤنٹ 30 دن کے لیے ایکٹیو کر دیا گیا ہے۔", reply_markup=get_main_menu_keyboard())
         except: pass
         return
 
@@ -308,18 +318,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         add_quotex_premium_db(target_id)
         await query.edit_message_caption(caption=query.message.caption + "\n\n✅ *Approved for Quotex Premium!*")
         try:
-            await context.bot.send_message(chat_id=target_id, text="🎉 مبارک ہو! آپ کا کوٹیکس پریمیئم اکاؤنٹ 30 دن کے لیے ایکٹیو کر دیا گیا ہے۔")
+            await context.bot.send_message(chat_id=target_id, text="🎉 مبارک ہو! آپ کا کوٹیکس پریمیئم اکاؤنٹ 30 دن کے لیے ایکٹیو کر دیا گیا ہے۔", reply_markup=get_main_menu_keyboard())
         except: pass
         return
 
-    # USER LOGIC
     if data.startswith("qxpair_"):
         pair_selected = data.split("_")[1]
         if not is_quotex_premium(user_id):
             _, quotex_clicks = get_free_clicks(user_id)
             if quotex_clicks >= 3:
                 limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
-                await context.bot.send_message(chat_id=user_id, text=limit_msg, parse_mode="Markdown")
+                await context.bot.send_message(chat_id=user_id, text=limit_msg, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
                 return
         await send_quotex_time_menu(context.bot, user_id, pair_selected)
         await query.message.delete()
@@ -337,10 +346,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             _, quotex_clicks = get_free_clicks(user_id)
             if quotex_clicks >= 3: 
                 limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
-                await context.bot.send_message(chat_id=user_id, text=limit_msg, parse_mode="Markdown")
+                await context.bot.send_message(chat_id=user_id, text=limit_msg, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
                 return
             increment_free_clicks(user_id, mode="quotex")
-            _, quotex_clicks = get_free_clicks(user_id) # Refresh count
+            _, quotex_clicks = get_free_clicks(user_id)
             clicks_left_str = f" (Clicks Left: {3 - quotex_clicks})"
         else:
             clicks_left_str = ""
@@ -357,9 +366,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📊 **Signal Accuracy:** {accuracy}%\n"
             f"📶 **Market Trend:** {trend}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"_(بڑے بھائی، مارکیٹ کا لائیو ڈیٹا اینالیسس مکمل ہو چکا ہے۔ ابھی پرافٹ بک کریں!)_"
+            f"_(بڑے بھائی, مارکیٹ کا لائیو ڈیٹا اینالیسس مکمل ہو چکا ہے۔ ابھی پرافٹ بک کریں!)_"
         )
-        await context.bot.send_message(chat_id=user_id, text=signal_msg, parse_mode='Markdown')
+        # Pass get_main_menu_keyboard() layout directly to make buttons persistent right below the final signal!
+        await context.bot.send_message(chat_id=user_id, text=signal_msg, reply_markup=get_main_menu_keyboard(), parse_mode='Markdown')
         return
 
 app = Application.builder().token(TOKEN).build()
