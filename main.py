@@ -155,7 +155,6 @@ def advanced_market_analysis(symbol_name, is_forex_mode=False):
     try:
         ticker_symbol = symbols_map.get(symbol_name, "EURUSD=X")
         ticker = yf.Ticker(ticker_symbol)
-        # 1-minute interval data for deep real-time technical analysis
         df = ticker.history(period="2d", interval="1m")
         
         if df.empty or len(df) < 20:
@@ -164,7 +163,6 @@ def advanced_market_analysis(symbol_name, is_forex_mode=False):
                 return f"RSI: {rsi_val:.4f}", "🟢 BUY (Trend)"
             return "🟢 CALL (UP) ↑", "BULLISH (💡 Dynamic Support)"
             
-        # RSI Formula Calculation
         delta = df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).ewm(alpha=1/14, adjust=False).mean()
         loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
@@ -176,7 +174,6 @@ def advanced_market_analysis(symbol_name, is_forex_mode=False):
         
         if is_forex_mode:
             rsi_str = f"RSI: {rsi:.4f}"
-            # Full Trend analysis via RSI and SMA-20 for EUR, GBP, and XAU
             if rsi < 35 or current_price > sma_20:
                 return rsi_str, "🟢 BUY (Trend)"
             else:
@@ -188,7 +185,6 @@ def advanced_market_analysis(symbol_name, is_forex_mode=False):
             else: return "🔴 PUT (DOWN) ↓", "BEARISH TREND (📉 Below SMA-20)"
             
     except:
-        # Crash safety fallback to prevent Railway errors
         rsi_val = random.uniform(40.0, 60.0)
         if is_forex_mode:
             act = random.choice(["🟢 BUY (Trend)", "🔴 SELL (Trend)"])
@@ -210,16 +206,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(urdu_welcome, reply_markup=reply_markup, parse_mode="Markdown")
 
-async def send_quotex_pairs_menu(bot, user_id):
+async def send_quotex_pairs_menu(bot, user_id, is_premium_user=False):
     keyboard = [
         [InlineKeyboardButton("💱 EUR/USD (OTC)", callback_data="qxpair_EURUSD"), InlineKeyboardButton("💱 GBP/USD (OTC)", callback_data="qxpair_GBPUSD")],
         [InlineKeyboardButton("💱 USD/JPY (OTC)", callback_data="qxpair_USDJPY"), InlineKeyboardButton("💱 AUD/USD (OTC)", callback_data="qxpair_AUDUSD")],
         [InlineKeyboardButton("🪙 Crypto IDX", callback_data="qxpair_CryptoIDX")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # یہاں چیک ہو رہا ہے کہ اگر پریمیئم یوزر ہے تو اپگریڈ کا ٹائٹل شو ہو
+    if is_premium_user:
+        text_header = "💎 **QUOTEX PREMIUM SIGNALS (Fully Analyzed)**\n\n📊 **Quotex Assets Selection**\n\nبڑے بھائی، کس پیئر کا گہرا لائیو اینالیسس سگنل چاہیے؟ نیچے سے منتخب کریں:"
+    else:
+        text_header = "📊 **Quotex Assets Selection**\n\nبڑے بھائی، کس پیئر کا گہرا لائیو اینالیسس سگنل چاہیے؟ نیچے سے منتخب کریں:"
+        
     await bot.send_message(
         chat_id=user_id,
-        text="📊 **Quotex Assets Selection**\n\nبڑے بھائی، کس پیئر کا گہرا لائیو اینالیسس سگنل چاہیے؟ نیچے سے منتخب کریں:",
+        text=text_header,
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
@@ -259,7 +262,6 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pairs = ["EURUSD", "GBPUSD", "XAUUSD"]
             
         msg = title
-        # Loop checks each pair completely and independently 
         for p in pairs:
             rsi_val, action = advanced_market_analysis(p, is_forex_mode=True)
             p_display = "EUR/USD" if p == "EURUSD" else "GBP/USD" if p == "GBPUSD" else "XAU/USD"
@@ -269,14 +271,15 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     elif text == "📉 Quotex Signals":
         if is_quotex_premium(user_id):
-            await send_quotex_pairs_menu(context.bot, user_id)
+            # پریمیئم ہونے کی صورت میں ٹائٹل کے ساتھ مینو جائے گا
+            await send_quotex_pairs_menu(context.bot, user_id, is_premium_user=True)
         else:
             if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
             if user_quotex_clicks[user_id] >= 3:
                 limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await update.message.reply_text(limit_msg, parse_mode="Markdown")
                 return
-            await send_quotex_pairs_menu(context.bot, user_id)
+            await send_quotex_pairs_menu(context.bot, user_id, is_premium_user=False)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
