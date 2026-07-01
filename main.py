@@ -20,7 +20,10 @@ ADMIN_ID = 5961662950
 QUOTEX_LINK = "https://broker-qx.pro/sign-up/?lid=2182439"
 VOICE_NOTE_FILE_ID = 'YOUR_VOICE_NOTE_FILE_ID_HERE'
 
-user_signals = {}
+# فری سگنلز کا ٹریک رکھنے کے لیے
+user_forex_clicks = {}
+user_quotex_clicks = {}
+
 symbols_map = {
     "EUR/USD": "EURUSD=X",
     "GBP/USD": "GBPUSD=X",
@@ -123,8 +126,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
         "🌟 **Welcome to ForeXAurA!** 🌟\n\n"
-        "بڑے بھائی، اپنی مارکیٹ کا انتخاب کریں:\n"
-        "📊 Forex Signals یا 📉 Quotex Signals کا بٹن دبائیں۔",
+        "بڑے بھائی، خوش آمدید! آپ کے بہترین ٹریڈنگ سفر کا آغاز یہیں سے ہوتا ہے۔\n"
+        "نیچے دیے گئے مینو سے اپنی مارکیٹ کا انتخاب کریں:\n\n"
+        "👉 **Forex / Quotex Signals** حاصل کرنے کے لیے بٹنز کا استعمال کریں۔\n"
+        "👉 فری یوزرز کے لیے صرف **3 فری سگنلز** دستیاب ہیں۔ لمٹ ختم ہونے کے بعد ان لمیٹڈ سگنلز کے لیے پریمیم پلان بائے کریں۔",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
@@ -138,7 +143,7 @@ async def send_quotex_menu(bot, user_id):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await bot.send_message(
         chat_id=user_id,
-        text="🎯 **ForeXAurA Quotex Premium Strategy**\n\nبڑے بھائی، ہائی ایکوریسی سگنل حاصل کرنے کے لیے اپنی اسٹریٹجی کا ٹائم فریم سلیکٹ کریں:",
+        text="🎯 **ForeXAurA Quotex Strategy**\n\nبڑے بھائی، ہائی ایکوریسی سگنل حاصل کرنے کے لیے اپنی اسٹریٹجی کا ٹائم فریم سلیکٹ کریں:",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
@@ -149,41 +154,62 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if text == "📊 Forex Signals":
         if is_premium(user_id):
-            msg = "💎 FOREX PREMIUM SIGNALS\n\n"
+            msg = "💎 **FOREX PREMIUM SIGNALS (Unlimited)**\n\n"
             for s in symbols_map.keys():
                 rsi, price, ema = get_market_data(s)
                 sig = signal_engine(rsi, price, ema)
-                msg += f"{s}\nSignal: {sig}\n\n"
-            await update.message.reply_text(msg)
+                msg += f"💱 {s}\nSignal: {sig}\n\n"
+            await update.message.reply_text(msg, parse_mode="Markdown")
         else:
-            if user_id not in user_signals: user_signals[user_id] = 0
-            if user_signals[user_id] >= 3:
-                await update.message.reply_text("💎 **Forex Premium Subscription (1000 PKR)**\n\nJazzCash: `03202656954`\nEasypaisa: `03287616051`\nAccount Name: Asad Ali\n\nفاریکس پریمیم سگنلز کے لیے پیمنٹ کر کے اسکرین شاٹ یہاں بھیجیں۔", parse_mode="Markdown")
+            if user_id not in user_forex_clicks: user_forex_clicks[user_id] = 0
+            
+            if user_forex_clicks[user_id] >= 3:
+                await update.message.reply_text(
+                    "❌ **آپ کے 3 فری فاریکس سگنلز ختم ہو چکے ہیں!**\n\n"
+                    "بڑے بھائی، اب ان لمیٹڈ (Jitna Marzi) سگنلز لینے کے لیے پریمیم سبسکرپشن لیں۔\n\n"
+                    "💎 **Forex Premium (1000 PKR / 30 Days)**\n"
+                    "• JazzCash: `03202656954`\n"
+                    "• Easypaisa: `03287616051`\n"
+                    "• Account Name: Asad Ali\n\n"
+                    "پیمنٹ کر کے اسکرین شاٹ یہاں بھیجیں، ایڈمن فوری ایکٹو کر دے گا۔", 
+                    parse_mode="Markdown"
+                )
                 return
-            user_signals[user_id] += 1
-            msg = "📊 FOREX FREE SIGNALS\n\n"
+                
+            user_forex_clicks[user_id] += 1
+            remaining = 3 - user_forex_clicks[user_id]
+            msg = f"📊 **FOREX FREE SIGNALS (Free Clicks Left: {remaining})**\n\n"
             for s in symbols_map.keys():
                 rsi, price, ema = get_market_data(s)
                 sig = signal_engine(rsi, price, ema)
-                msg += f"{s}\nSignal: {sig}\n\n"
-            await update.message.reply_text(msg)
+                msg += f"💱 {s}\nSignal: {sig}\n\n"
+            await update.message.reply_text(msg, parse_mode="Markdown")
         
     elif text == "📉 Quotex Signals":
         if is_quotex_premium(user_id):
             await send_quotex_menu(context.bot, user_id)
         else:
-            quotex_payment_text = (
-                "📉 **QUOTEX PREMIUM SIGNALS**\n\n"
-                "🎁 **لنک آفر پلان (1000 PKR):**\n"
-                f"نیچے دیے گئے لنک سے نیا اکاؤنٹ بنا کر ٹریڈر آئی ڈی اور اسکرین شاٹ بھیجیں:\n👉 {QUOTEX_LINK}\n\n"
-                "❌ **بغیر لنک پلان (1500 PKR):**\n"
-                "اگر لنک سے اکاؤنٹ نہیں بنانا تو فیس 1500 روپے ہوگی۔\n\n"
-                "💳 **Accounts (Asad Ali):**\n"
-                "• JazzCash: `03202656954`\n"
-                "• Easypaisa: `03287616051`\n\n"
-                "📤 کوئٹیکس پریمیم ایکٹو کروانے کے لیے پیمنٹ اسکرین شاٹ یہاں بھیجیں۔"
-            )
-            await update.message.reply_text(quotex_payment_text, parse_mode="Markdown")
+            if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
+            
+            if user_quotex_clicks[user_id] >= 3:
+                quotex_payment_text = (
+                    "❌ **آپ کے 3 فری کوئٹیکس سگنلز ختم ہو چکے ہیں!**\n\n"
+                    "بڑے بھائی، اب ان لمیٹڈ (Jitna Marzi) سگنلز کے لیے پریمیم پلان بائے کریں۔\n\n"
+                    "🎁 **لنک آفر پلان (1000 PKR):**\n"
+                    f"نیچے دیے گئے لنک سے نیا اکاؤنٹ بنا کر ٹریڈر آئی ڈی اور اسکرین شاٹ بھیجیں:\n👉 {QUOTEX_LINK}\n\n"
+                    "❌ **بغیر لنک پلان (1500 PKR):**\n"
+                    "اگر لنک سے اکاؤنٹ نہیں بنانا تو فیس 1500 روپے ہوگی۔\n\n"
+                    "💳 **Accounts (Asad Ali):**\n"
+                    "• JazzCash: `03202656954`\n"
+                    "• Easypaisa: `03287616051`\n\n"
+                    "📤 کوئٹیکس پریمیم ایکٹو کروانے کے لیے پیمنٹ اسکرین شاٹ یہاں بھیجیں۔"
+                )
+                await update.message.reply_text(quotex_payment_text, parse_mode="Markdown")
+                return
+                
+            # فری یوزر کو ڈائریکٹ مینو دکھا کر سگنل دینا لیکن کلک کاؤنٹ کرنا
+            user_quotex_clicks[user_id] += 1
+            await send_quotex_menu(context.bot, user_id)
 
 # ================= RECEIVE SCREENSHOT =================
 
@@ -215,10 +241,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.message.chat.id
 
-    # کوئٹیکس اسٹریٹجی پریمیم سگنل جنریٹر
+    # کوئٹیکس اسٹریٹجی سگنل جنریٹر
     if data.startswith("qx_"):
         t_frame = data.split("_")[1]
         
+        # اگر پریمیم نہیں ہے اور کلک لمٹ کراس ہو چکی ہے تو روک دیں
+        if not is_quotex_premium(user_id) and user_quotex_clicks.get(user_id, 0) > 3:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="❌ **فری لمٹ ختم!** بڑے بھائی، پریمیم خریدیں تاکہ آپ ان لمیٹڈ سگنلز لے سکیں اور بٹنز کام کریں۔"
+            )
+            return
+            
         rsi, price, ema = get_market_data("EUR/USD")
         pairs = ['EUR/USD (OTC)', 'GBP/USD (OTC)', 'USD/JPY (OTC)', 'AUD/USD (OTC)', 'Crypto IDX']
         selected_pair = random.choice(pairs)
@@ -250,17 +284,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ایڈمن اپروول بٹنز
     if query.from_user.id != ADMIN_ID: return
 
-    # 1. فاریکس اپروول (بالکل الگ)
+    # 1. فاریکس اپروول
     if data.startswith("app_forex_"):
         target_id = int(data.split("_")[2])
         add_premium_db(target_id)
         
         await context.bot.send_message(
             chat_id=target_id, 
-            text="🎉 **Forex Premium Activated!**\n\nبڑے بھائی، آپ کا فاریکس پریمیم پلان **30 دن** کے لیے کامیابی سے بائے ہو گیا ہے۔ اب آپ پریمیم فاریکس سگنلز حاصل کر سکتے ہیں۔"
+            text="🎉 **Forex Premium Activated!**\n\nبڑے بھائی، آپ کا فاریکس پریمیم پلان **30 دن** کے لیے کامیابی سے بائے ہو گیا ہے۔ اب آپ جتنے مرضی ان لمیٹڈ پریمیم فاریکس سگنلز حاصل کریں۔"
         )
         
-        # فاریکس کے لیے وائس نوٹ آٹو سینڈ کرنا
         if VOICE_NOTE_FILE_ID != 'YOUR_VOICE_NOTE_FILE_ID_HERE':
             try:
                 await context.bot.send_voice(
@@ -271,18 +304,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except: pass
         await query.edit_message_caption("✅ Approved Forex Premium (30 Days)")
 
-    # 2. کوئٹیکس اپروول (بالکل الگ)
+    # 2. کوئٹیکس اپروول
     elif data.startswith("app_quotex_"):
         target_id = int(data.split("_")[2])
         add_quotex_premium_db(target_id)
         
         await context.bot.send_message(
             chat_id=target_id, 
-            text="🎉 **Quotex Premium Activated!**\n\nبڑے بھائی! آپ کا کوئٹیکس اسٹریٹجی پریمیم پلان **30 دن** کے لیے کامیابی سے بائے ہو چکا ہے۔"
+            text="🎉 **Quotex Premium Activated!**\n\nبڑے بھائی! آپ کا کوئٹیکس اسٹریٹجی پریمیم پلان **30 دن** کے لیے کامیابی سے بائے ہو چکا ہے۔ اب آپ ان لمیٹڈ سگنلز لے سکتے ہیں۔"
         )
         await send_quotex_menu(context.bot, target_id)
         
-        # کوئٹیکس کے لیے بھی وہی وائس نوٹ آٹو سینڈ کرنا
         if VOICE_NOTE_FILE_ID != 'YOUR_VOICE_NOTE_FILE_ID_HERE':
             try:
                 await context.bot.send_voice(
@@ -331,7 +363,7 @@ async def check_expiry_loop(application: Application):
 app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.Text(["📊 Forex Signals", "📉 Quotex Signals"]), handle_text_menu))
-app.add_handler(filters.PHOTO, receive_photo)
+app.add_handler(MessageHandler(filters.PHOTO, receive_photo))  # یہاں ایرر فکس کر دیا ہے!
 app.add_handler(MessageHandler(filters.VOICE, catch_voice_id))
 app.add_handler(CallbackQueryHandler(button_handler))
 
