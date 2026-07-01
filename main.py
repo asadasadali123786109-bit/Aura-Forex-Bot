@@ -96,7 +96,7 @@ def add_quotex_premium_db(user_id):
 
 def get_market_data(symbol_name):
     try:
-        ticker_symbol = symbols_map.get(symbol_name)
+        ticker_symbol = symbols_map.get(symbol_name, "EURUSD=X")
         ticker = yf.Ticker(ticker_symbol)
         df = ticker.history(period="5d", interval="1m")
         if df.empty: return None, None, None
@@ -119,7 +119,7 @@ def signal_engine(rsi, price, ema):
     if rsi > 65 and price < ema: return "🔴 SELL (Strong)"
     return "🟢 BUY (Trend)" if rsi < 50 else "🔴 SELL (Trend)"
 
-# ================= COMMANDS & TEXT HANDLERS =================
+# ================= MENUS & FLOWS =================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[KeyboardButton("📊 Forex Signals"), KeyboardButton("📉 Quotex Signals")]]
@@ -134,16 +134,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-async def send_quotex_menu(bot, user_id):
+# کوئٹیکس پیئرز کا مینو
+async def send_quotex_pairs_menu(bot, user_id):
     keyboard = [
-        [InlineKeyboardButton("⚡ 1 Second", callback_data="qx_1sec"), InlineKeyboardButton("⏱️ 30 Seconds", callback_data="qx_30sec")],
-        [InlineKeyboardButton("🕐 1 Minute", callback_data="qx_1min"), InlineKeyboardButton("🕒 5 Minutes", callback_data="qx_5min")],
-        [InlineKeyboardButton("⏳ 30 Minutes", callback_data="qx_30min"), InlineKeyboardButton("⏰ 1 Hour", callback_data="qx_1hour")]
+        [InlineKeyboardButton("💱 EUR/USD (OTC)", callback_data="qxpair_EURUSD"), InlineKeyboardButton("💱 GBP/USD (OTC)", callback_data="qxpair_GBPUSD")],
+        [InlineKeyboardButton("💱 USD/JPY (OTC)", callback_data="qxpair_USDJPY"), InlineKeyboardButton("💱 AUD/USD (OTC)", callback_data="qxpair_AUDUSD")],
+        [InlineKeyboardButton("🪙 Crypto IDX", callback_data="qxpair_CryptoIDX")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await bot.send_message(
         chat_id=user_id,
-        text="🎯 **ForeXAurA Quotex Strategy**\n\nبڑے بھائی، ہائی ایکوریسی سگنل حاصل کرنے کے لیے اپنی اسٹریٹجی کا ٹائم فریم سلیکٹ کریں:",
+        text="📊 **Quotex Assets Selection**\n\nبڑے بھائی، کس مشہور پیئر (Pair) کا سگنل چاہیے؟ نیچے سے سلیکٹ کریں:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+# ٹائم فریم کا مینو (5 Seconds شامل کر دیا گیا ہے)
+async def send_quotex_time_menu(bot, user_id, pair_name):
+    keyboard = [
+        [InlineKeyboardButton("⚡ 5 Seconds", callback_data=f"qxt_5sec_{pair_name}"), InlineKeyboardButton("⏱️ 30 Seconds", callback_data=f"qxt_30sec_{pair_name}")],
+        [InlineKeyboardButton("🕐 1 Minute", callback_data=f"qxt_1min_{pair_name}"), InlineKeyboardButton("🕒 5 Minutes", callback_data=f"qxt_5min_{pair_name}")],
+        [InlineKeyboardButton("⏳ 30 Minutes", callback_data=f"qxt_30min_{pair_name}"), InlineKeyboardButton("⏰ 1 Hour", callback_data=f"qxt_1hour_{pair_name}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await bot.send_message(
+        chat_id=user_id,
+        text=f"🎯 **Pair Selected:** {pair_name.replace('SUB', '/')}\n\nبڑے بھائی، اب اس پیئر کے لیے اپنی اسٹریٹجی کا ٹائم فریم سلیکٹ کریں:",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
@@ -187,7 +203,7 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     elif text == "📉 Quotex Signals":
         if is_quotex_premium(user_id):
-            await send_quotex_menu(context.bot, user_id)
+            await send_quotex_pairs_menu(context.bot, user_id)
         else:
             if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
             
@@ -207,9 +223,8 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(quotex_payment_text, parse_mode="Markdown")
                 return
                 
-            # فری یوزر کو ڈائریکٹ مینو دکھا کر سگنل دینا لیکن کلک کاؤنٹ کرنا
-            user_quotex_clicks[user_id] += 1
-            await send_quotex_menu(context.bot, user_id)
+            # فری یوزر کو پیئر مینو دکھائیں لیکن کلک کاؤنٹ سگنل فائنل ہونے پر ہوگا
+            await send_quotex_pairs_menu(context.bot, user_id)
 
 # ================= RECEIVE SCREENSHOT =================
 
@@ -241,21 +256,41 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.message.chat.id
 
-    # کوئٹیکس اسٹریٹجی سگنل جنریٹر
-    if data.startswith("qx_"):
-        t_frame = data.split("_")[1]
+    # 1. جب یوزر کوئٹیکس کا پیئر چوز کرے
+    if data.startswith("qxpair_"):
+        pair_selected = data.split("_")[1] # e.g. EURUSD, CryptoIDX
+        # پیئر سلیکٹ ہونے کے بعد ٹائم فریم مینو بھیجیں
+        await send_quotex_time_menu(context.bot, user_id, pair_selected)
+        await query.message.delete() # پرانا میسج صاف کر دیں
+        return
+
+    # 2. جب یوزر ٹائم فریم سلیکٹ کرے (فائنل سگنل جنریشن)
+    if data.startswith("qxt_"):
+        parts = data.split("_")
+        t_frame = parts[1]      # e.g. 5sec, 1min
+        chosen_pair = parts[2]   # e.g. EURUSD, CryptoIDX
         
-        # اگر پریمیم نہیں ہے اور کلک لمٹ کراس ہو چکی ہے تو روک دیں
-        if not is_quotex_premium(user_id) and user_quotex_clicks.get(user_id, 0) > 3:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text="❌ **فری لمٹ ختم!** بڑے بھائی، پریمیم خریدیں تاکہ آپ ان لمیٹڈ سگنلز لے سکیں اور بٹنز کام کریں۔"
-            )
-            return
-            
-        rsi, price, ema = get_market_data("EUR/USD")
-        pairs = ['EUR/USD (OTC)', 'GBP/USD (OTC)', 'USD/JPY (OTC)', 'AUD/USD (OTC)', 'Crypto IDX']
-        selected_pair = random.choice(pairs)
+        # خوبصورت ڈسپلے نام کے لیے تبدیلیاں
+        display_pair = chosen_pair
+        if chosen_pair == "EURUSD": display_pair = "EUR/USD (OTC)"
+        elif chosen_pair == "GBPUSD": display_pair = "GBP/USD (OTC)"
+        elif chosen_pair == "USDJPY": display_pair = "USD/JPY (OTC)"
+        elif chosen_pair == "AUDUSD": display_pair = "AUD/USD (OTC)"
+        elif chosen_pair == "CryptoIDX": display_pair = "Crypto IDX"
+
+        # پریمیم اور فری لمٹ چیک کریں
+        if not is_quotex_premium(user_id):
+            if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
+            if user_quotex_clicks[user_id] >= 3:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="❌ **آپ کے 3 فری کوئٹیکس سگنلز ختم ہو چکے ہیں!** بڑے بھائی، اب مزید ان لمیٹڈ سگنلز پریمیم پلان میں ہی ملیں گے۔"
+                )
+                return
+            user_quotex_clicks[user_id] += 1 # یہاں کلک رجسٹر کریں
+
+        # ہائی ایکوریسی سگنل انجن لاجک
+        rsi, price, ema = get_market_data(chosen_pair)
         
         if rsi and rsi < 45:
             action = "🟢 CALL (UP) ↑"
@@ -270,7 +305,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         signal_msg = (
             f"🎯 **ForeXAurA QUOTEX STRATEGY SIGNAL**\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"💱 **Asset/Pair:** {selected_pair}\n"
+            f"💱 **Asset/Pair:** {display_pair}\n"
             f"🚀 **Direction:** {action}\n"
             f"⏳ **Strategy Time:** {t_frame}\n"
             f"📊 **Signal Accuracy:** {accuracy}%\n"
@@ -284,45 +319,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ایڈمن اپروول بٹنز
     if query.from_user.id != ADMIN_ID: return
 
-    # 1. فاریکس اپروول
     if data.startswith("app_forex_"):
         target_id = int(data.split("_")[2])
         add_premium_db(target_id)
-        
         await context.bot.send_message(
             chat_id=target_id, 
-            text="🎉 **Forex Premium Activated!**\n\nبڑے بھائی، آپ کا فاریکس پریمیم پلان **30 دن** کے لیے کامیابی سے بائے ہو گیا ہے۔ اب آپ جتنے مرضی ان لمیٹڈ پریمیم فاریکس سگنلز حاصل کریں۔"
+            text="🎉 **Forex Premium Activated!**\n\nبڑے بھائی، آپ کا فاریکس پریمیم پلان **30 دن** کے لیے ایکٹو کر دیا گیا ہے۔ اب جتنے مرضی ان لمیٹڈ سگنلز لیں۔"
         )
-        
-        if VOICE_NOTE_FILE_ID != 'YOUR_VOICE_NOTE_FILE_ID_HERE':
-            try:
-                await context.bot.send_voice(
-                    chat_id=target_id, 
-                    voice=VOICE_NOTE_FILE_ID, 
-                    caption="🚨 **ForeXAurA Important Warning!**\nبڑے بھائی، فاریکس پریمیم استعمال کرنے سے پہلے یہ وائس نوٹ لازمی سنیں۔"
-                )
-            except: pass
         await query.edit_message_caption("✅ Approved Forex Premium (30 Days)")
 
-    # 2. کوئٹیکس اپروول
     elif data.startswith("app_quotex_"):
         target_id = int(data.split("_")[2])
         add_quotex_premium_db(target_id)
-        
         await context.bot.send_message(
             chat_id=target_id, 
-            text="🎉 **Quotex Premium Activated!**\n\nبڑے بھائی! آپ کا کوئٹیکس اسٹریٹجی پریمیم پلان **30 دن** کے لیے کامیابی سے بائے ہو چکا ہے۔ اب آپ ان لمیٹڈ سگنلز لے سکتے ہیں۔"
+            text="🎉 **Quotex Premium Activated!**\n\nبڑے بھائی! آپ کا کوئٹیکس اسٹریٹجی پریمیم پلان **30 دن** کے لیے ایکٹو ہو چکا ہے۔ اب ان لمیٹڈ پیئرز کے سگنلز انجوائے کریں۔"
         )
-        await send_quotex_menu(context.bot, target_id)
-        
-        if VOICE_NOTE_FILE_ID != 'YOUR_VOICE_NOTE_FILE_ID_HERE':
-            try:
-                await context.bot.send_voice(
-                    chat_id=target_id, 
-                    voice=VOICE_NOTE_FILE_ID, 
-                    caption="🚨 **ForeXAurA Important Warning!**\nبڑے بھائی، کوئٹیکس پریمیم استعمال کرنے سے پہلے یہ وائس نوٹ لازمی سنیں۔"
-                )
-            except: pass
+        await send_quotex_pairs_menu(context.bot, target_id)
         await query.edit_message_caption("✅ Approved Quotex Premium (30 Days)")
 
 async def catch_voice_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -363,7 +376,7 @@ async def check_expiry_loop(application: Application):
 app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.Text(["📊 Forex Signals", "📉 Quotex Signals"]), handle_text_menu))
-app.add_handler(MessageHandler(filters.PHOTO, receive_photo))  # یہاں ایرر فکس کر دیا ہے!
+app.add_handler(MessageHandler(filters.PHOTO, receive_photo))
 app.add_handler(MessageHandler(filters.VOICE, catch_voice_id))
 app.add_handler(CallbackQueryHandler(button_handler))
 
