@@ -19,25 +19,25 @@ ADMIN_ID = 5961662950
 
 QUOTEX_LINK = "https://broker-qx.pro/sign-up/?lid=2182439"
 
-# 💳 PAYMENT DETAILS (Asad Ali Bhai accounts added)
+# 💳 PAYMENT DETAILS (Asad Ali Bhai accounts)
 FOREX_PAYMENT_DETAILS = (
-    "💳 *Forex Premium Payment Methods* 💳\n\n"
-    "🔥 *Fee:* 1000 PKR / 30 Days (Unlimited Signals)\n\n"
+    "💳 *فاریکس پریمیئم پیمنٹ کا طریقہ کار* 💳\n\n"
+    "🔥 *فیس:* 1000 PKR / 30 دن (ان لمیٹڈ سگنلز)\n\n"
     "📱 *JazzCash:* `03282656954` (Asad ali)\n"
     "📱 *Easypaisa:* `03287616051` (Asad ali)\n"
     "📱 *SADApay:* `03287616051` (Asad ali)\n\n"
-    "⚠️ *Important:* Payment ke baad screenshot aur apna Account Number (Chat ID) admin ko @ForeXAurA_Admin par send karein."
+    "⚠️ *اہم نوٹ:* پیسے بھیجنے کے بعد ٹرانزیکشن کا سکرین شاٹ اسی بوٹ کے اندر سینڈ کریں، یہ خودکار طور پر ایڈمن کو چلا جائے گا۔"
 )
 
 QUOTEX_PAYMENT_DETAILS = (
-    "💳 *Quotex Premium Payment Methods* 💳\n\n"
-    "🔗 *Mera Link se join karne walo ke liye:* 1000 PKR / Month\n"
-    "❌ *Bagar Link join karne walo ke liye:* 1500 PKR / Month\n\n"
-    "📌 *Quotex Joining Link:* [Click Here to Register Setup]({link})\n\n"
+    "💳 *کوٹیکس پریمیئم پیمنٹ کا طریقہ کار* 💳\n\n"
+    "🔗 *ہمارے لنک سے اکاؤنٹ بنانے والوں کے لیے:* 1000 PKR / مہینہ\n"
+    "❌ *بغیر لنک جوائن کرنے والوں کے لیے:* 1500 PKR / مہینہ\n\n"
+    "📌 *Quotex Joining Link:* [اکاؤنٹ بنانے کے لیے یہاں کلک کریں]({link})\n\n"
     "📱 *JazzCash:* `03282656954` (Asad ali)\n"
     "📱 *Easypaisa:* `03287616051` (Asad ali)\n"
     "📱 *SADApay:* `03287616051` (Asad ali)\n\n"
-    "⚠️ *Important:* Account bana kar ya direct payment kar ke screenshot aur apni Chat ID admin ko send karein."
+    "⚠️ *اہم نوٹ:* پیسے بھیجنے یا اکاؤنٹ بنانے کے بعد سکرین شاٹ اسی بوٹ کے اندر سینڈ کریں، یہ خودکار طور پر ایڈمن کو چلا جائے گا۔"
 ).format(link=QUOTEX_LINK)
 
 user_forex_clicks = {}
@@ -71,7 +71,11 @@ def is_premium(user_id):
     row = cursor.fetchone()
     conn.close()
     if row:
-        return datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S')
+        if datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S'):
+            return True
+        else:
+            # 30 دن پورے ہونے پر آؤٹ کرنا
+            return False
     return False
 
 def is_quotex_premium(user_id):
@@ -83,7 +87,11 @@ def is_quotex_premium(user_id):
     row = cursor.fetchone()
     conn.close()
     if row:
-        return datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S')
+        if datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S'):
+            return True
+        else:
+            # 30 دن پورے ہونے پر آؤٹ کرنا
+            return False
     return False
 
 def add_premium_db(user_id):
@@ -111,6 +119,10 @@ async def approve_forex(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_id = int(context.args[0])
         add_premium_db(target_id)
         await update.message.reply_text(f"✅ User {target_id} has been approved for Forex Premium (30 Days)!")
+        try:
+            await context.bot.send_message(chat_id=target_id, text="🎉 مبارک ہو! آپ کا فاریکس پریمیئم اکاؤنٹ 30 دن کے لیے ایکٹیو کر دیا گیا ہے۔")
+        except:
+            pass
     except (IndexError, ValueError):
         await update.message.reply_text("❌ Sahi tareeqa: `/approve_forex [user_id]`")
 
@@ -122,8 +134,40 @@ async def approve_quotex(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_id = int(context.args[0])
         add_quotex_premium_db(target_id)
         await update.message.reply_text(f"✅ User {target_id} has been approved for Quotex Premium (30 Days)!")
+        try:
+            await context.bot.send_message(chat_id=target_id, text="🎉 مبارک ہو! آپ کا کوٹیکس پریمیئم اکاؤنٹ 30 دن کے لیے ایکٹیو کر دیا گیا ہے۔")
+        except:
+            pass
     except (IndexError, ValueError):
         await update.message.reply_text("❌ Sahi tareeqa: `/approve_quotex [user_id]`")
+
+# SCREENSHOT FORWARDER TO ADMIN INBOX
+async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id == ADMIN_ID:
+        return
+    
+    # فارورڈ ٹو ایڈمن پرسنل ان باکس
+    caption_text = (
+        f"📩 *New Payment Screenshot Received!*\n\n"
+        f"👤 *Name:* {user.full_name}\n"
+        f"👤 *Username:* @{user.username if user.username else 'None'}\n"
+        f"🆔 *Account Number (Chat ID):* `{user.id}`\n\n"
+        f"Aprove karne ke liye commands:\n"
+        f"For Forex: `/approve_forex {user.id}`\n"
+        f"For Quotex: `/approve_quotex {user.id}`"
+    )
+    
+    await context.bot.send_photo(
+        chat_id=ADMIN_ID,
+        photo=update.message.photo[-1].file_id,
+        caption=caption_text,
+        parse_mode="Markdown"
+    )
+    
+    await update.message.reply_text(
+        "✅ آپ کا سکرین شاٹ ایڈمن کو موصول ہو گیا ہے! آپ کا ڈیٹا چیک کر کے اکاؤنٹ کچھ ہی دیر میں پریمیئم کر دیا جائے گا۔ شکریہ!"
+    )
 
 # Advanced Market Analysis Engine
 def advanced_market_analysis(symbol_name):
@@ -162,15 +206,16 @@ def advanced_market_analysis(symbol_name):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[KeyboardButton("📊 Forex Signals"), KeyboardButton("📉 Quotex Signals")]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(
-        "🌟 **Welcome to ForeXAurA!** 🌟\n\n"
-        "Bade bhai, market ka live data analyze kar ke signal dene wala final engine taiyar hai.\n\n"
-        "👉 **Forex / Quotex Signals** hasil karne ke liye neeche diye gaye menu buttons ka istemal karein.\n"
-        f"🆔 **Your Account Number (Chat ID):** `{update.effective_user.id}`\n"
-        "👉 Free users ke liye rozana sirf **3 free signals** dastiyab hain.",
-        reply_markup=reply_markup,
-        parse_mode="Markdown"
+    
+    # ویلکم مینو مکمل اردو میں تبدیل کر دیا گیا ہے
+    urdu_welcome = (
+        "🌟 *ForeXAurA میں خوش آمدید!* 🌟\n\n"
+        "بڑے بھائی، مارکیٹ کا لائیو ڈیٹا اینالائز کر کے پرافٹ ایبل سگنل دینے والا فائنل انجن بالکل تیار ہے۔\n\n"
+        "👉 *Forex / Quotex Signals* حاصل کرنے کے لیے نیچے دیے گئے مینو بٹنز کا استعمال کریں۔\n"
+        f"🆔 *آپ کا اکاؤنٹ نمبر (Chat ID):* `{update.effective_user.id}`\n"
+        "👉 فری یوزرز کے لیے روزانہ صرف *3 فری سگنلز* دستیاب ہیں۔"
     )
+    await update.message.reply_text(urdu_welcome, reply_markup=reply_markup, parse_mode="Markdown")
 
 async def send_quotex_pairs_menu(bot, user_id):
     keyboard = [
@@ -181,7 +226,7 @@ async def send_quotex_pairs_menu(bot, user_id):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await bot.send_message(
         chat_id=user_id,
-        text="📊 **Quotex Assets Selection**\n\nBade bhai, kis pair ka gehra live analysis signal chahiye? Neeche se select karein:",
+        text="📊 **Quotex Assets Selection**\n\nبڑے بھائی، کس پیئر کا گہرا لائیو اینالیسس سگنل چاہیے؟ نیچے سے منتخب کریں:",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
@@ -195,7 +240,7 @@ async def send_quotex_time_menu(bot, user_id, pair_name):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await bot.send_message(
         chat_id=user_id,
-        text=f"🎯 **Pair Selected:** {pair_name}\n\nBade bhai, ab is pair ke liye apni strategy ka time-frame select karein:",
+        text=f"🎯 **Pair Selected:** {pair_name}\n\nبڑے بھائی، اب اس پیئر کے لیے اپنی اسٹریٹجی کا ٹائم فریم سلیکٹ کریں:",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
@@ -215,7 +260,7 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             if user_id not in user_forex_clicks: user_forex_clicks[user_id] = 0
             if user_forex_clicks[user_id] >= 3:
-                limit_msg = f"❌ *Free Forex Limits Reached!*\n\n{FOREX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
+                limit_msg = f"❌ *آپ کے فری فاریکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{FOREX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await update.message.reply_text(limit_msg, parse_mode="Markdown")
                 return
             user_forex_clicks[user_id] += 1
@@ -232,7 +277,7 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
             if user_quotex_clicks[user_id] >= 3:
-                limit_msg = f"❌ *Free Quotex Limits Reached!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
+                limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await update.message.reply_text(limit_msg, parse_mode="Markdown")
                 return
             await send_quotex_pairs_menu(context.bot, user_id)
@@ -249,7 +294,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_quotex_premium(user_id):
             if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
             if user_quotex_clicks[user_id] >= 3:
-                limit_msg = f"❌ *Free Quotex Limits Reached!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
+                limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await context.bot.send_message(chat_id=user_id, text=limit_msg, parse_mode="Markdown")
                 return
 
@@ -268,7 +313,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_quotex_premium(user_id):
             if user_id not in user_quotex_clicks: user_quotex_clicks[user_id] = 0
             if user_quotex_clicks[user_id] >= 3: 
-                limit_msg = f"❌ *Free Quotex Limits Reached!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
+                limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
                 await context.bot.send_message(chat_id=user_id, text=limit_msg, parse_mode="Markdown")
                 return
             user_quotex_clicks[user_id] += 1
@@ -285,7 +330,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📊 **Signal Accuracy:** {accuracy}%\n"
             f"📶 **Market Trend:** {trend}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"_(Bade bhai, market ka live data analysis mukammal ho chuka hai. Abhi profit book karein!)_"
+            f"_(بڑے بھائی، مارکیٹ کا لائیو ڈیٹا اینالیسس مکمل ہو چکا ہے۔ ابھی پرافٹ بک کریں!)_"
         )
         await context.bot.send_message(chat_id=user_id, text=signal_msg, parse_mode='Markdown')
         return
@@ -294,6 +339,7 @@ app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("approve_forex", approve_forex))
 app.add_handler(CommandHandler("approve_quotex", approve_quotex))
+app.add_handler(MessageHandler(filters.PHOTO, handle_screenshot))  # سکرین شاٹ ہینڈلر شامل کر دیا
 app.add_handler(MessageHandler(filters.Text(["📊 Forex Signals", "📉 Quotex Signals"]), handle_text_menu))
 app.add_handler(CallbackQueryHandler(button_handler))
 
