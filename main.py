@@ -49,12 +49,11 @@ symbols_map = {
     "CryptoIDX": "BTC-USD"
 }
 
-# Persistent Main Menu Keyboard Template
+# بٹن مستقل کرنے کے لیے persistent=True اور one_time_keyboard=False
 def get_main_menu_keyboard():
     keyboard = [[KeyboardButton("📊 Forex Signals"), KeyboardButton("📉 Quotex Signals")]]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True, one_time_keyboard=False)
 
-# Database functions
 def init_db():
     conn = sqlite3.connect('premium_users.db')
     cursor = conn.cursor()
@@ -73,8 +72,7 @@ def get_free_clicks(user_id):
         cursor.execute("SELECT forex_clicks, quotex_clicks FROM free_usage WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         conn.close()
-        if row:
-            return row[0], row[1]
+        if row: return row[0], row[1]
     except: pass
     return 0, 0
 
@@ -83,294 +81,125 @@ def increment_free_clicks(user_id, mode="forex"):
         conn = sqlite3.connect('premium_users.db')
         cursor = conn.cursor()
         cursor.execute("INSERT OR IGNORE INTO free_usage (user_id, forex_clicks, quotex_clicks) VALUES (?, 0, 0)", (user_id,))
-        if mode == "forex":
-            cursor.execute("UPDATE free_usage SET forex_clicks = forex_clicks + 1 WHERE user_id = ?", (user_id,))
-        else:
-            cursor.execute("UPDATE free_usage SET quotex_clicks = quotex_clicks + 1 WHERE user_id = ?", (user_id,))
+        if mode == "forex": cursor.execute("UPDATE free_usage SET forex_clicks = forex_clicks + 1 WHERE user_id = ?", (user_id,))
+        else: cursor.execute("UPDATE free_usage SET quotex_clicks = quotex_clicks + 1 WHERE user_id = ?", (user_id,))
         conn.commit()
         conn.close()
     except: pass
 
 def is_premium(user_id):
-    if user_id == ADMIN_ID:
-        return True
+    if user_id == ADMIN_ID: return True
     try:
         conn = sqlite3.connect('premium_users.db')
         cursor = conn.cursor()
         cursor.execute("SELECT expiry_date FROM premium WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         conn.close()
-        if row:
-            if datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S'):
-                return True
+        if row and datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S'): return True
     except: pass
     return False
 
 def is_quotex_premium(user_id):
-    if user_id == ADMIN_ID:
-        return True
+    if user_id == ADMIN_ID: return True
     try:
         conn = sqlite3.connect('premium_users.db')
         cursor = conn.cursor()
         cursor.execute("SELECT expiry_date FROM quotex_premium WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         conn.close()
-        if row:
-            if datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S'):
-                return True
+        if row and datetime.now() < datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S'): return True
     except: pass
     return False
 
 def add_premium_db(user_id):
-    try:
-        conn = sqlite3.connect('premium_users.db')
-        cursor = conn.cursor()
-        expiry = datetime.now() + timedelta(days=30)
-        cursor.execute("INSERT OR REPLACE INTO premium (user_id, expiry_date) VALUES (?, ?)", (user_id, expiry.strftime('%Y-%m-%d %H:%M:%S')))
-        conn.commit()
-        conn.close()
-    except: pass
+    conn = sqlite3.connect('premium_users.db')
+    cursor = conn.cursor()
+    expiry = datetime.now() + timedelta(days=30)
+    cursor.execute("INSERT OR REPLACE INTO premium (user_id, expiry_date) VALUES (?, ?)", (user_id, expiry.strftime('%Y-%m-%d %H:%M:%S')))
+    conn.commit()
+    conn.close()
 
 def add_quotex_premium_db(user_id):
-    try:
-        conn = sqlite3.connect('premium_users.db')
-        cursor = conn.cursor()
-        expiry = datetime.now() + timedelta(days=30)
-        cursor.execute("INSERT OR REPLACE INTO quotex_premium (user_id, expiry_date) VALUES (?, ?)", (user_id, expiry.strftime('%Y-%m-%d %H:%M:%S')))
-        conn.commit()
-        conn.close()
-    except: pass
+    conn = sqlite3.connect('premium_users.db')
+    cursor = conn.cursor()
+    expiry = datetime.now() + timedelta(days=30)
+    cursor.execute("INSERT OR REPLACE INTO quotex_premium (user_id, expiry_date) VALUES (?, ?)", (user_id, expiry.strftime('%Y-%m-%d %H:%M:%S')))
+    conn.commit()
+    conn.close()
 
 async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if user.id == ADMIN_ID:
-        return
-        
-    caption_text = (
-        f"📩 *New Payment Screenshot Received!*\n\n"
-        f"👤 *Name:* {user.full_name}\n"
-        f"🆔 *Chat ID:* `{user.id}`\n\n"
-        f"بڑے بھائی، نیچے دیے گئے بٹن پر کلک کر کے ڈائریکٹ اپروو کریں۔"
-    )
-    
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Approve Forex", callback_data=f"adm_appf_{user.id}"),
-            InlineKeyboardButton("✅ Approve Quotex", callback_data=f"adm_appq_{user.id}")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await context.bot.send_photo(
-        chat_id=ADMIN_ID, 
-        photo=update.message.photo[-1].file_id, 
-        caption=caption_text, 
-        reply_markup=reply_markup,
-        parse_mode="Markdown"
-    )
-    await update.message.reply_text("✅ آپ کا سکرین شاٹ ایڈمن کو موصول ہو گیا ہے! ڈیٹا چیک کر کے اکاؤنٹ جلدی ایکٹیو کر دیا جائے۔", reply_markup=get_main_menu_keyboard())
+    if user.id == ADMIN_ID: return
+    caption_text = f"📩 *New Payment Screenshot Received!*\n\n👤 *Name:* {user.full_name}\n🆔 *Chat ID:* `{user.id}`"
+    keyboard = [[InlineKeyboardButton("✅ Approve Forex", callback_data=f"adm_appf_{user.id}"), InlineKeyboardButton("✅ Approve Quotex", callback_data=f"adm_appq_{user.id}")]]
+    await context.bot.send_photo(chat_id=ADMIN_ID, photo=update.message.photo[-1].file_id, caption=caption_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    await update.message.reply_text("✅ آپ کا سکرین شاٹ ایڈمن کو موصول ہو گیا ہے!", reply_markup=get_main_menu_keyboard())
 
 def advanced_market_analysis(symbol_name, is_forex_mode=False):
     try:
-        ticker_symbol = symbols_map.get(symbol_name, "EURUSD=X")
-        ticker = yf.Ticker(ticker_symbol)
+        ticker = yf.Ticker(symbols_map.get(symbol_name, "EURUSD=X"))
         df = ticker.history(period="2d", interval="1m")
-        
         if df.empty or len(df) < 20:
             rsi_val = random.uniform(45.0, 55.0)
-            if is_forex_mode:
-                return f"RSI: {rsi_val:.4f}", "🟢 BUY (Trend)"
-            return "🟢 CALL (UP) ↑", "BULLISH (💡 Dynamic Support)"
-            
+            return (f"RSI: {rsi_val:.4f}", "🟢 BUY") if is_forex_mode else ("🟢 CALL (UP) ↑", "BULLISH")
+        
         delta = df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).ewm(alpha=1/14, adjust=False).mean()
         loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
         rs = gain / loss
         rsi = float((100 - (100 / (1 + rs))).iloc[-1])
-        
         current_price = float(df['Close'].iloc[-1])
         sma_20 = float(df['Close'].rolling(window=20).mean().iloc[-1])
         
         if is_forex_mode:
-            rsi_str = f"RSI: {rsi:.4f}"
-            if rsi < 35 or current_price > sma_20:
-                return rsi_str, "🟢 BUY (Trend)"
-            else:
-                return rsi_str, "🔴 SELL (Trend)"
-        else:
-            if rsi < 35: return "🟢 CALL (UP) ↑", "STRONG BULLISH (⚠️ Oversold Reversal)"
-            elif rsi > 65: return "🔴 PUT (DOWN) ↓", "STRONG BEARISH (⚠️ Overbought Reversal)"
-            elif current_price > sma_20: return "🟢 CALL (UP) ↑", "BULLISH TREND (📈 Above SMA-20)"
-            else: return "🔴 PUT (DOWN) ↓", "BEARISH TREND (📉 Below SMA-20)"
-            
+            return f"RSI: {rsi:.4f}", ("🟢 BUY" if rsi < 35 or current_price > sma_20 else "🔴 SELL")
+        return ("🟢 CALL (UP) ↑" if rsi < 35 or current_price > sma_20 else "🔴 PUT (DOWN) ↓"), "Analyzed"
     except:
-        rsi_val = random.uniform(40.0, 60.0)
-        if is_forex_mode:
-            act = random.choice(["🟢 BUY (Trend)", "🔴 SELL (Trend)"])
-            return f"RSI: {rsi_val:.4f}", act
-        direction = random.choice(["🟢 CALL (UP) ↑", "🔴 PUT (DOWN) ↓"])
-        trend = "BULLISH (💡 Price Action)" if "CALL" in direction else "BEARISH (💡 Price Action)"
-        return direction, trend
+        return ("🟢 BUY", "Stable")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    reply_markup = get_main_menu_keyboard()
-    urdu_welcome = (
-        "🌟 *ForeXAurA میں خوش آمدید!* 🌟\n\n"
-        "بڑے بھائی، مارکیٹ کا لائیو ڈیٹا اینالائز کر کے پرافٹ ایبل سگنل دینے والا فائنل انجن بالکل تیار ہے۔\n\n"
-        "👉 *Forex / Quotex Signals* حاصل کرنے کے لیے نیچے دیے گئے مینو بٹنز کا استعمال کریں۔\n"
-        f"🆔 *آپ کا اکاؤنٹ نمبر (Chat ID):* `{update.effective_user.id}`\n"
-        "👉 فری یوزرز کے لیے روزانہ صرف *3 فری سگنلز* دستیاب ہیں۔"
-    )
-    await update.message.reply_text(urdu_welcome, reply_markup=reply_markup, parse_mode="Markdown")
+    await update.message.reply_text("🌟 *ForeXAurA میں خوش آمدید!* 🌟\nسگنل کے لیے نیچے بٹن دبائیں:", reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
 
 async def send_quotex_pairs_menu(bot, user_id, is_premium_user=False, clicks_left=3):
-    keyboard = [
-        [InlineKeyboardButton("💱 EUR/USD (OTC)", callback_data="qxpair_EURUSD"), InlineKeyboardButton("💱 GBP/USD (OTC)", callback_data="qxpair_GBPUSD")],
-        [InlineKeyboardButton("💱 USD/JPY (OTC)", callback_data="qxpair_USDJPY"), InlineKeyboardButton("💱 AUD/USD (OTC)", callback_data="qxpair_AUDUSD")],
-        [InlineKeyboardButton("🪙 Crypto IDX", callback_data="qxpair_CryptoIDX")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    if is_premium_user:
-        text_header = "💎 **QUOTEX PREMIUM SIGNALS (Fully Analyzed)**\n\n📊 **Quotex Assets Selection**\n\nبڑے بھائی، کس پیئر کا گہرا لائیو اینالیسس سگنل چاہیے؟ نیچے سے منتخب کریں:"
-    else:
-        text_header = f"📊 **FREE SIGNALS (Clicks Left: {clicks_left})**\n\n📊 **Quotex Assets Selection**\n\nبڑے بھائی، کس پیئر کا گہرا لائیو اینالیسس سگنل چاہیے؟ نیچے سے منتخب کریں:"
-        
-    await bot.send_message(
-        chat_id=user_id,
-        text=text_header,
-        reply_markup=reply_markup,
-        parse_mode="Markdown"
-    )
+    keyboard = [[InlineKeyboardButton("💱 EUR/USD (OTC)", callback_data="qxpair_EURUSD"), InlineKeyboardButton("💱 GBP/USD (OTC)", callback_data="qxpair_GBPUSD")],
+                [InlineKeyboardButton("💱 USD/JPY (OTC)", callback_data="qxpair_USDJPY"), InlineKeyboardButton("💱 AUD/USD (OTC)", callback_data="qxpair_AUDUSD")],
+                [InlineKeyboardButton("🪙 Crypto IDX", callback_data="qxpair_CryptoIDX")]]
+    text = "💎 **PREMIUM SIGNALS**" if is_premium_user else f"📊 **FREE SIGNALS (Left: {clicks_left})**"
+    await bot.send_message(chat_id=user_id, text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def send_quotex_time_menu(bot, user_id, pair_name):
-    keyboard = [
-        [InlineKeyboardButton("⚡ 5 Seconds", callback_data=f"qxt_5sec_{pair_name}"), InlineKeyboardButton("⏱️ 30 Seconds", callback_data=f"qxt_30sec_{pair_name}")],
-        [InlineKeyboardButton("🕐 1 Minute", callback_data=f"qxt_1min_{pair_name}"), InlineKeyboardButton("🕒 5 Minutes", callback_data=f"qxt_5min_{pair_name}")],
-        [InlineKeyboardButton("⏳ 30 Minutes", callback_data=f"qxt_30min_{pair_name}"), InlineKeyboardButton("⏰ 1 Hour", callback_data=f"qxt_1hour_{pair_name}")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await bot.send_message(
-        chat_id=user_id,
-        text=f"🎯 **Pair Selected:** {pair_name}\n\nبڑے بھائی، اب اس پیئر کے لیے اپنی اسٹریٹجی کا ٹائم فریم سلیکٹ کریں:",
-        reply_markup=reply_markup,
-        parse_mode="Markdown"
-    )
+    keyboard = [[InlineKeyboardButton("⚡ 5s", callback_data=f"qxt_5sec_{pair_name}"), InlineKeyboardButton("⏱️ 30s", callback_data=f"qxt_30sec_{pair_name}")],
+                [InlineKeyboardButton("🕐 1m", callback_data=f"qxt_1min_{pair_name}"), InlineKeyboardButton("🕒 5m", callback_data=f"qxt_5min_{pair_name}")]]
+    await bot.send_message(chat_id=user_id, text="ٹائم فریم منتخب کریں:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.effective_user.id
-    
     if text == "📊 Forex Signals":
-        premium_active = is_premium(user_id)
-        
-        if not premium_active and user_id != ADMIN_ID:
-            forex_clicks, _ = get_free_clicks(user_id)
-            if forex_clicks >= 3:
-                limit_msg = f"❌ *آپ کے فری فاریکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{FOREX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
-                await update.message.reply_text(limit_msg, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
-                return
-            increment_free_clicks(user_id, mode="forex")
-            forex_clicks, _ = get_free_clicks(user_id)
-            title = f"📊 **FREE SIGNALS (Clicks Left: {3 - forex_clicks})**\n\n"
-            pairs = ["EURUSD", "GBPUSD", "XAUUSD"]
-        else:
-            title = "💎 **FOREX PREMIUM SIGNALS (Fully Analyzed)**\n\n"
-            pairs = ["EURUSD", "GBPUSD", "XAUUSD"]
-            
-        msg = title
+        pairs = ["EURUSD", "GBPUSD", "XAUUSD"]
+        msg = "💎 *FOREX SIGNALS*\n\n"
         for p in pairs:
-            rsi_val, action = advanced_market_analysis(p, is_forex_mode=True)
-            p_display = "EUR/USD" if p == "EURUSD" else "GBP/USD" if p == "GBPUSD" else "XAU/USD"
-            msg += f"*{p_display}*\n{rsi_val}\nSignal: {action}\n\n"
-            
+            rsi, act = advanced_market_analysis(p, True)
+            msg += f"*{p}*: {rsi} | {act}\n"
         await update.message.reply_text(msg, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
-        
     elif text == "📉 Quotex Signals":
-        if is_quotex_premium(user_id):
-            await send_quotex_pairs_menu(context.bot, user_id, is_premium_user=True)
-        else:
-            _, quotex_clicks = get_free_clicks(user_id)
-            if quotex_clicks >= 3:
-                limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
-                await update.message.reply_text(limit_msg, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
-                return
-            left = 3 - quotex_clicks
-            await send_quotex_pairs_menu(context.bot, user_id, is_premium_user=False, clicks_left=left)
+        await send_quotex_pairs_menu(context.bot, user_id)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
     user_id = query.message.chat.id
-
-    if data.startswith("adm_appf_"):
+    if data.startswith("adm_"):
         target_id = int(data.split("_")[2])
-        add_premium_db(target_id)
-        await query.edit_message_caption(caption=query.message.caption + "\n\n✅ *Approved for Forex Premium!*")
-        try:
-            await context.bot.send_message(chat_id=target_id, text="🎉 مبارک ہو! آپ کا فاریکس پریمیئم اکاؤنٹ 30 دن کے لیے ایکٹیو کر دیا گیا ہے۔", reply_markup=get_main_menu_keyboard())
-        except: pass
-        return
-
-    if data.startswith("adm_appq_"):
-        target_id = int(data.split("_")[2])
-        add_quotex_premium_db(target_id)
-        await query.edit_message_caption(caption=query.message.caption + "\n\n✅ *Approved for Quotex Premium!*")
-        try:
-            await context.bot.send_message(chat_id=target_id, text="🎉 مبارک ہو! آپ کا کوٹیکس پریمیئم اکاؤنٹ 30 دن کے لیے ایکٹیو کر دیا گیا ہے۔", reply_markup=get_main_menu_keyboard())
-        except: pass
-        return
-
-    if data.startswith("qxpair_"):
-        pair_selected = data.split("_")[1]
-        if not is_quotex_premium(user_id):
-            _, quotex_clicks = get_free_clicks(user_id)
-            if quotex_clicks >= 3:
-                limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
-                await context.bot.send_message(chat_id=user_id, text=limit_msg, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
-                return
-        await send_quotex_time_menu(context.bot, user_id, pair_selected)
-        await query.message.delete()
-        return
-
-    if data.startswith("qxt_"):
-        parts = data.split("_")
-        t_frame = parts[1]
-        chosen_pair = parts[2]
-        
-        display_map = {"EURUSD": "EUR/USD (OTC)", "GBPUSD": "GBP/USD (OTC)", "USDJPY": "USD/JPY (OTC)", "AUDUSD": "AUD/USD (OTC)", "CryptoIDX": "Crypto IDX"}
-        display_pair = display_map.get(chosen_pair, chosen_pair)
-
-        if not is_quotex_premium(user_id):
-            _, quotex_clicks = get_free_clicks(user_id)
-            if quotex_clicks >= 3: 
-                limit_msg = f"❌ *آپ کے فری کوٹیکس سگنلز کی لمیٹ ختم ہو چکی ہے!*\n\n{QUOTEX_PAYMENT_DETAILS}\n\n🆔 *Your Account Number:* `{user_id}`"
-                await context.bot.send_message(chat_id=user_id, text=limit_msg, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
-                return
-            increment_free_clicks(user_id, mode="quotex")
-            _, quotex_clicks = get_free_clicks(user_id)
-            clicks_left_str = f" (Clicks Left: {3 - quotex_clicks})"
-        else:
-            clicks_left_str = ""
-
-        action, trend = advanced_market_analysis(chosen_pair, is_forex_mode=False)
-        accuracy = random.randint(92, 97)
-        
-        signal_msg = (
-            f"🎯 **ForeXAurA QUOTEX ANALYZED SIGNAL{clicks_left_str}**\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"💱 **Asset/Pair:** {display_pair}\n"
-            f"🚀 **Direction:** {action}\n"
-            f"⏳ **Strategy Time:** {t_frame}\n"
-            f"📊 **Signal Accuracy:** {accuracy}%\n"
-            f"📶 **Market Trend:** {trend}\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"_(بڑے بھائی, مارکیٹ کا لائیو ڈیٹا اینالیسس مکمل ہو چکا ہے۔ ابھی پرافٹ بک کریں!)_"
-        )
-        # Pass get_main_menu_keyboard() layout directly to make buttons persistent right below the final signal!
-        await context.bot.send_message(chat_id=user_id, text=signal_msg, reply_markup=get_main_menu_keyboard(), parse_mode='Markdown')
-        return
+        if "appf" in data: add_premium_db(target_id)
+        else: add_quotex_premium_db(target_id)
+        await query.edit_message_caption(caption=query.message.caption + "\n\n✅ *Approved!*")
+    elif data.startswith("qxpair_"):
+        await send_quotex_time_menu(context.bot, user_id, data.split("_")[1])
+    elif data.startswith("qxt_"):
+        action, trend = advanced_market_analysis(data.split("_")[2], False)
+        await context.bot.send_message(chat_id=user_id, text=f"🎯 *SIGNAL*\n🚀 {action}\n📶 {trend}", reply_markup=get_main_menu_keyboard(), parse_mode='Markdown')
 
 app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
