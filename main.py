@@ -136,19 +136,23 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text("✅ آپ کا سکرین شاٹ ایڈمن کو موصول ہو گیا ہے! ڈیٹا چیک کر کے اکاؤنٹ جلدی ایکٹیو کر دیا جائے گا۔")
 
-# FULL MARKET ANALYSIS ENGINE
+# FULL MARKET ANALYSIS ENGINE (WITH ULTRA LEVEL QUOTEX UPGRADE)
 def advanced_market_analysis(symbol_name, is_forex_mode=False):
     try:
         ticker_symbol = symbols_map.get(symbol_name, "EURUSD=X")
         ticker = yf.Ticker(ticker_symbol)
-        df = ticker.history(period="2d", interval="1m")
         
-        if df.empty or len(df) < 20:
+        # Pulling data for Ultra Level Quotex indicators
+        df = ticker.history(period="5d", interval="1m")
+        df_higher = ticker.history(period="5d", interval="5m") # For Multi Timeframe Trend
+        
+        if df.empty or len(df) < 50:
             rsi_val = random.uniform(45.0, 55.0)
             if is_forex_mode:
                 return f"RSI: {rsi_val:.4f}", "🟢 BUY (Trend)"
             return "🟢 CALL (UP) ↑", "BULLISH (💡 Dynamic Support)"
             
+        # 1. RSI (Relative Strength Index)
         delta = df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).ewm(alpha=1/14, adjust=False).mean()
         loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
@@ -158,23 +162,155 @@ def advanced_market_analysis(symbol_name, is_forex_mode=False):
         current_price = float(df['Close'].iloc[-1])
         sma_20 = float(df['Close'].rolling(window=20).mean().iloc[-1])
         
+        # --- FOREX MODE (UNCHANGED) ---
         if is_forex_mode:
             rsi_str = f"RSI: {rsi:.4f}"
             if rsi < 35 or current_price > sma_20:
                 return rsi_str, "🟢 BUY (Trend)"
             else:
                 return rsi_str, "🔴 SELL (Trend)"
+                
+        # --- ULTRA LEVEL QUOTEX ENGINE ---
         else:
-            if rsi < 35: return "🟢 CALL (UP) ↑", "STRONG BULLISH (⚠️ Oversold Reversal)"
-            elif rsi > 65: return "🔴 PUT (DOWN) ↓", "STRONG BEARISH (⚠️ Overbought Reversal)"
-            elif current_price > sma_20: return "🟢 CALL (UP) ↑", "BULLISH TREND (📈 Above SMA-20)"
-            else: return "🔴 PUT (DOWN) ↓", "BEARISH TREND (📉 Below SMA-20)"
+            # 2. EMA 20 & EMA 50 Calculation
+            ema_20 = float(df['Close'].ewm(span=20, adjust=False).mean().iloc[-1])
+            ema_50 = float(df['Close'].ewm(span=50, adjust=False).mean().iloc[-1])
             
-    except:
-        rsi_val = random.uniform(40.0, 60.0)
-        if is_forex_mode:
-            act = random.choice(["🟢 BUY (Trend)", "🔴 SELL (Trend)"])
-            return f"RSI: {rsi_val:.4f}", act
+            # 3. MACD Calculation
+            exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+            exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+            macd_line = exp1 - exp2
+            signal_line = macd_line.ewm(span=9, adjust=False).mean()
+            current_macd = float(macd_line.iloc[-1])
+            current_signal = float(signal_line.iloc[-1])
+            
+            # 4. Bollinger Bands Calculation
+            bb_sma = df['Close'].rolling(window=20).mean()
+            bb_std = df['Close'].rolling(window=20).std()
+            upper_band = float((bb_sma + (bb_std * 2)).iloc[-1])
+            lower_band = float((bb_sma - (bb_std * 2)).iloc[-1])
+            
+            # 5. Support / Resistance Levels (Price Action peaks/troughs)
+            recent_highs = df['High'].tail(30)
+            recent_lows = df['Low'].tail(30)
+            resistance_level = float(recent_highs.max())
+            support_level = float(recent_lows.min())
+            
+            # 6. Volume Confirmation
+            has_volume = True
+            if 'Volume' in df.columns and len(df) > 10:
+                avg_volume = df['Volume'].tail(10).mean()
+                current_volume = df['Volume'].iloc[-1]
+                if current_volume < (avg_volume * 0.7):
+                    has_volume = False
+                    
+            # 7. Multi Timeframe Trend (5m Check)
+            mtf_trend = "NEUTRAL"
+            if not df_higher.empty and len(df_higher) >= 20:
+                higher_sma = df_higher['Close'].rolling(window=20).mean().iloc[-1]
+                higher_close = df_higher['Close'].iloc[-1]
+                mtf_trend = "BULLISH" if higher_close > higher_sma else "BEARISH"
+
+            # 8. Candlestick Patterns Detection
+            open_p = float(df['Open'].iloc[-1])
+            high_p = float(df['High'].iloc[-1])
+            low_p = float(df['Low'].iloc[-1])
+            close_p = float(df['Close'].iloc[-1])
+            
+            body = abs(close_p - open_p)
+            candle_range = high_p - low_p if (high_p - low_p) > 0 else 0.0001
+            upper_shadow = high_p - max(open_p, close_p)
+            lower_shadow = min(open_p, close_p) - low_p
+            
+            is_hammer = lower_shadow > (2 * body) and upper_shadow < (0.1 * candle_range)
+            is_doji = body <= (0.1 * candle_range)
+            is_bearish = close_p < open_p
+            
+            # Scoring / Confluence Weight Matrix Setup
+            call_score = 0
+            put_score = 0
+            reasons = []
+            
+            # Analyzing Technical Indicators Indicators
+            if rsi < 30:
+                call_score += 3
+                reasons.append("RSI Oversold 📉")
+            elif rsi > 70:
+                put_score += 3
+                reasons.append("RSI Overbought 📈")
+                
+            if ema_20 > ema_50:
+                call_score += 2
+                reasons.append("EMA Golden Cross ⚡")
+            else:
+                put_score += 2
+                reasons.append("EMA Death Cross ⚡")
+                
+            if current_macd > current_signal:
+                call_score += 2
+                reasons.append("MACD Bullish Crossover 📊")
+            else:
+                put_score += 2
+                reasons.append("MACD Bearish Crossover 📊")
+                
+            if current_price <= lower_band:
+                call_score += 3
+                reasons.append("Bollinger Bottom Breakout 📉")
+            elif current_price >= upper_band:
+                put_score += 3
+                reasons.append("Bollinger Top Breakout 📈")
+                
+            if abs(current_price - support_level) < (current_price * 0.0005):
+                call_score += 3
+                reasons.append("Strong Support Reversal 💡")
+            elif abs(current_price - resistance_level) < (current_price * 0.0005):
+                put_score += 3
+                reasons.append("Strong Resistance Reversal 💡")
+                
+            if mtf_trend == "BULLISH":
+                call_score += 1
+            elif mtf_trend == "BEARISH":
+                put_score += 1
+
+            # Analyzing Candlestick Logic
+            if is_hammer:
+                call_score += 3
+                reasons.append("Hammer Candlestick 🔨")
+            if is_doji:
+                if rsi < 40:
+                    call_score += 2
+                    reasons.append("Doji At Bottom ⚖️")
+                elif rsi > 60:
+                    put_score += 2
+                    reasons.append("Doji At Top ⚖️")
+            if is_bearish:
+                put_score += 1
+                reasons.append("Bearish Momentum Head 🩸")
+            else:
+                call_score += 1
+                reasons.append("Bullish Momentum Head 🔋")
+
+            # Low volume security filter
+            if not has_volume:
+                call_score = max(0, call_score - 2)
+                put_score = max(0, put_score - 2)
+            
+            # Final Signal Generation
+            if call_score > put_score and call_score >= 5:
+                trend_str = f"ULTRA BULLISH ({', '.join(reasons[:2])})"
+                return "🟢 CALL (UP) ↑", trend_str
+            elif put_score > call_score and put_score >= 5:
+                trend_str = f"ULTRA BEARISH ({', '.join(reasons[:2])})"
+                return "🔴 PUT (DOWN) ↓", trend_str
+            else:
+                # Fallback clean trend matching if scores are low
+                if current_price > ema_20:
+                    return "🟢 CALL (UP) ↑", "BULLISH TREND (📈 EMA-20 Support)"
+                else:
+                    return "🔴 PUT (DOWN) ↓", "BEARISH TREND (📉 EMA-20 Resistance)"
+            
+    except Exception as e:
+        # Fallback system if data retrieval errors out
         direction = random.choice(["🟢 CALL (UP) ↑", "🔴 PUT (DOWN) ↓"])
         trend = "BULLISH (💡 Price Action)" if "CALL" in direction else "BEARISH (💡 Price Action)"
         return direction, trend
