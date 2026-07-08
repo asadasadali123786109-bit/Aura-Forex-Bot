@@ -13,10 +13,17 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # /start کمانڈ
     app.add_handler(CommandHandler("start", start))
 
+    # Forex Signals بٹن
     app.add_handler(
         MessageHandler(filters.Regex("^📊 Forex Signals$"), forex_signals)
+    )
+
+    # XAUUSD Signals بٹن
+    app.add_handler(
+        MessageHandler(filters.Regex("^🥇 XAUUSD Signals$"), xauusd_signal)
     )
 
     logger.info("Aura Forex Bot Started")
