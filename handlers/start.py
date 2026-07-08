@@ -2,6 +2,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from database import add_user
+from utils.keyboard import main_menu
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -14,7 +15,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user.first_name
     )
 
-    await update.message.reply_text(
-        f"السلام علیکم {user.first_name} 👋\n\n"
-        "Aura Forex Bot میں خوش آمدید۔"
-    )
+    aawait update.message.reply_text(
+    f"السلام علیکم {user.first_name} 👋\n\n"
+    "Aura Forex Bot میں خوش آمدید.",
+    reply_markup=main_menu()
+)
