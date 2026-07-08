@@ -1,19 +1,9 @@
-from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes
-)
+from telegram.ext import Application, CommandHandler
 
 from config import BOT_TOKEN
 from database import create_tables
+from handlers.start import start
 from logger import logger
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "السلام علیکم!\n\nAura Forex Bot میں خوش آمدید۔"
-    )
 
 
 def main():
@@ -23,7 +13,7 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
 
-    logger.info("Bot Started")
+    logger.info("Aura Forex Bot Started")
 
     app.run_polling()
 
