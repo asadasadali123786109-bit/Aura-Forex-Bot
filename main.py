@@ -1,3 +1,4 @@
+from handlers.xauusd import xauusd_signal
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from config import BOT_TOKEN
